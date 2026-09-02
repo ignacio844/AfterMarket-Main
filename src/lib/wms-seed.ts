@@ -1,0 +1,97 @@
+import type { WmsModule } from "@/lib/wms-types";
+
+export const wmsSeedModules: WmsModule[] = [
+  {
+    id: "seed-capacitacion",
+    slug: "capacitacion",
+    name: "Plan de capacitación",
+    description: "Materiales de formación, configuraciones y documentación compartida con el equipo SGL.",
+    iconKey: "graduation-cap",
+    position: 0,
+    resources: [
+      { id: "seed-cap-principal", slug: "principal", name: "Plan de capacitación - SGL", href: "https://drive.google.com/drive/folders/0AN0BEGxurtnnUk9PVA", type: "Carpeta", isPrimary: true, position: 0 },
+      { id: "seed-cap-1", slug: "instructivos-operacionales", name: "Instructivos Operacionales", href: "https://drive.google.com/drive/folders/12AZsSW4OLbl9J6TlaS2ptlfRgumnwW5u?usp=drive_link", type: "Carpeta", isPrimary: false, position: 1 },
+      { id: "seed-cap-2", slug: "configuraciones-wms", name: "Configuraciones WMS", href: "https://drive.google.com/drive/folders/1DlpjKy6q-pdh45MTeA7jxzdybMNHnFoV?usp=drive_link", type: "Carpeta", isPrimary: false, position: 2 },
+      { id: "seed-cap-3", slug: "entrenamiento-equipo-sgl", name: "Entrenamiento - Equipo SGL", href: "https://drive.google.com/drive/folders/1rEpt1z4K3Zp8XzrENxQBzhw6S_ZGiS5?usp=drive_link", type: "Carpeta", isPrimary: false, position: 3 },
+      { id: "seed-cap-4", slug: "documentos-equipo-sgl", name: "Documentos - Equipo SGL", href: "https://drive.google.com/drive/folders/1IeNIePurdDI-u6C4oL2xdw3LN5luj1EN?usp=drive_link", type: "Carpeta", isPrimary: false, position: 4 },
+    ],
+  },
+  {
+    id: "seed-funcionalidades",
+    slug: "funcionalidades",
+    name: "Funcionalidades",
+    description: "Manuales, glosarios y herramientas para comprender la operación del sistema.",
+    iconKey: "boxes",
+    position: 1,
+    resources: [
+      { id: "seed-fun-principal", slug: "principal", name: "Funcionalidades", href: "https://drive.google.com/drive/folders/0AJj9qkDUVP7gUk9PVA", type: "Carpeta", isPrimary: true, position: 0 },
+      { id: "seed-fun-1", slug: "manual-sglwms", name: "Manual SGLWMS", href: "https://drive.google.com/drive/folders/1tmT3Y9TZLjDgifVtkh6IPJ-DYZxlASru", type: "Carpeta", isPrimary: false, position: 1 },
+      { id: "seed-fun-2", slug: "glosario-interfaz", name: "Glosario - Interfaz", href: "https://docs.google.com/document/d/1mKFLsX7eeNadSaftiVbvVo1CZfKj3_LL/edit?usp=sharing&ouid=101674496346329341048&rtpof=true&sd=true", type: "Documento", isPrimary: false, position: 2 },
+      { id: "seed-fun-3", slug: "glosario-rf", name: "Glosario - RF", href: "https://docs.google.com/document/d/1gIpES2AiaZeappub4cgWlug2qfRfM58e/edit?usp=sharing&ouid=101674496346329341048&rtpof=true&sd=true", type: "Documento", isPrimary: false, position: 3 },
+      { id: "seed-fun-4", slug: "herramientas-gestion", name: "Herramientas de Gestión", href: "https://docs.google.com/document/d/10sc2NiStP6KvK7u3H9TKqpDe6qX8Uvuv/edit?usp=sharing&ouid=101674496346329341048&rtpof=true&sd=true", type: "Documento", isPrimary: false, position: 4 },
+    ],
+  },
+  {
+    id: "seed-lanzamiento",
+    slug: "lanzamiento",
+    name: "Lanzamiento",
+    description: "Presentación general y seguimiento del estado de lanzamiento de SGLWMS.",
+    iconKey: "rocket",
+    position: 2,
+    resources: [
+      { id: "seed-lan-principal", slug: "principal", name: "Lanzamiento", href: "https://docs.google.com/presentation/d/13YmInCLNNC8pvwDa3c4TzBDaKagncGzo/edit?usp=sharing&ouid=101674496346329341048&rtpof=true&sd=true", type: "Presentación", isPrimary: true, position: 0 },
+      { id: "seed-lan-1", slug: "estado-lanzamiento", name: "Estado - Lanzamiento SGLWMS", href: "https://docs.google.com/spreadsheets/d/11kedQyHUKaHY6uwFxwbahPvm_CuxniDgHJiXk3makCs/edit?usp=sharing", type: "Planilla", isPrimary: false, position: 1 },
+    ],
+  },
+  {
+    id: "seed-operaciones",
+    slug: "operaciones",
+    name: "Operaciones logísticas",
+    description: "Procedimientos y recursos para recepción, inventario y control de la operación.",
+    iconKey: "warehouse",
+    position: 3,
+    resources: [
+      { id: "seed-ope-principal", slug: "principal", name: "Operaciones logísticas", href: "https://drive.google.com/drive/folders/1tmT3Y9TZLjDgifVtkh6IPJ-DYZxlASru", type: "Carpeta", isPrimary: true, position: 0 },
+      { id: "seed-ope-1", slug: "procedimiento-reportes", name: "Procedimiento y Reportes", href: "https://drive.google.com/drive/folders/13BB37j8FC79jOltCyTVsWDxURJ-zQuHy", type: "Carpeta", isPrimary: false, position: 1 },
+      { id: "seed-ope-2", slug: "recepcion", name: "Recepción", href: "https://drive.google.com/drive/folders/1dPCKar02VQ3vbe2Ye7XXpTr1a876LfNB?usp=drive_link", type: "Carpeta", isPrimary: false, position: 2 },
+      { id: "seed-ope-3", slug: "inventario", name: "Inventario", href: "https://drive.google.com/drive/folders/19oJbzr6U8g9gGEpgEiSHMTkHbgPtZYSp", type: "Carpeta", isPrimary: false, position: 3 },
+      { id: "seed-ope-4", slug: "auditorias-internas", name: "Auditorías Internas", href: "https://drive.google.com/drive/folders/1SGPqpKlhdByg1l7GVFBh5psTnLYWFU_W", type: "Carpeta", isPrimary: false, position: 4 },
+      { id: "seed-ope-5", slug: "procedimiento-meli", name: "Procedimiento MELI", href: "https://docs.google.com/document/d/1nvyiJHjwrQ6loKj5aevjPVHiEA244ME8/edit?usp=sharing&ouid=101674496346329341048&rtpof=true&sd=true", type: "Documento", isPrimary: false, position: 5 },
+    ],
+  },
+  {
+    id: "seed-proyecto",
+    slug: "proyecto",
+    name: "Proyecto SGL",
+    description: "Documentación de referencia y presentación general del proyecto Distrimar - SGLWMS.",
+    iconKey: "folder-kanban",
+    position: 4,
+    resources: [
+      { id: "seed-pro-principal", slug: "principal", name: "Proyecto SGL", href: "https://drive.google.com/drive/folders/1xYNPfw0xtsna7WXZOhOHF4ZQNe_VpMVp?usp=drive_link", type: "Carpeta", isPrimary: true, position: 0 },
+      { id: "seed-pro-1", slug: "proyecto-distrimar-sglwms", name: "Proyecto DISTRIMAR - SGLWMS", href: "https://docs.google.com/presentation/d/13YmInCLNNC8pvwDa3c4TzBDaKagncGzo/edit?usp=sharing&ouid=101674496346329341048&rtpof=true&sd=true", type: "Presentación", isPrimary: false, position: 1 },
+    ],
+  },
+  {
+    id: "seed-manuales",
+    slug: "manuales",
+    name: "Manuales de usuario",
+    description: "Documentación funcional destinada a los usuarios de la operación WMS.",
+    iconKey: "book-open",
+    position: 5,
+    resources: [
+      { id: "seed-man-principal", slug: "principal", name: "Manuales de usuario", href: "https://drive.google.com/drive/folders/1w6Ra2wC73wNGLWlqCp8KtveTLM9NEoIP?usp=drive_link", type: "Carpeta", isPrimary: true, position: 0 },
+      { id: "seed-man-1", slug: "requerimientos-funcionales", name: "Requerimientos funcionales", href: "https://docs.google.com/document/d/1jMxaOHj__9S2pqxvCNSnBfIYrIXsEDlT/edit?usp=sharing&ouid=101674496346329341048&rtpof=true&sd=true", type: "Documento", isPrimary: false, position: 1 },
+    ],
+  },
+  {
+    id: "seed-otros",
+    slug: "otros",
+    name: "Otros documentos",
+    description: "Carpeta complementaria para documentación adicional relacionada con la implementación.",
+    iconKey: "files",
+    position: 6,
+    resources: [
+      { id: "seed-otr-principal", slug: "principal", name: "Otros documentos", href: "https://drive.google.com/drive/folders/1HRpP0o1cs1WuXoW0Se1Tq2Yqhi37Ndf4?usp=drive_link", type: "Carpeta", isPrimary: true, position: 0 },
+    ],
+  },
+];
