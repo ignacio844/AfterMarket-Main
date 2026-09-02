@@ -168,6 +168,7 @@ Google OAuth ya está integrado y probado correctamente.
 - El portal completo requiere iniciar sesión.
 - Actualmente el acceso general admite cuentas del dominio `@grupo-aftermarket.com`.
 - La edición WMS se limita a los tres correos indicados anteriormente.
+- El dominio, la lista opcional de usuarios generales y los correos editores se configuran directamente en `src/lib/portal-auth.ts`; no dependen de variables de Vercel.
 - Más adelante debe definirse la lista fija completa de usuarios generales si Ignacio decide abandonar la autorización por dominio.
 - La pantalla de acceso mantiene la identidad visual del portal.
 
@@ -228,9 +229,6 @@ AUTH_GOOGLE_SECRET
 AUTH_TRUST_HOST
 SUPABASE_URL
 SUPABASE_SECRET_KEY
-PORTAL_ALLOWED_DOMAIN
-PORTAL_ALLOWED_EMAILS
-PORTAL_EDITOR_EMAILS
 ```
 
 `.env.local` está ignorado por Git. `.env.example` contiene únicamente la estructura y valores públicos o vacíos.

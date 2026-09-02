@@ -1,31 +1,31 @@
 import "server-only";
 
-const defaultEditors = [
+// Autorizaciones versionadas del portal. Estos valores no son secretos y se
+// modifican aquí cuando cambian los usuarios o el dominio habilitado.
+const portalAllowedDomain = "grupo-aftermarket.com";
+
+// Si esta lista contiene correos, reemplaza la autorización general por dominio.
+const portalAllowedEmails: string[] = [];
+
+const portalEditors = [
   "ignacio@grupo-aftermarket.com",
   "etelias@grupo-aftermarket.com",
   "jpajon@grupo-aftermarket.com",
 ];
 
-function parseEmails(value: string | undefined) {
-  return (value ?? "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
-
 export function isPortalEditor(email: string | null | undefined) {
   if (!email) return false;
-  const editors = parseEmails(process.env.PORTAL_EDITOR_EMAILS);
-  return (editors.length > 0 ? editors : defaultEditors).includes(email.toLowerCase());
+  const normalizedEmail = email.toLowerCase();
+  return portalEditors.some((editor) => editor.toLowerCase() === normalizedEmail);
 }
 
 export function isPortalUserAllowed(email: string | null | undefined) {
   if (!email) return false;
   const normalizedEmail = email.toLowerCase();
-  const allowedEmails = parseEmails(process.env.PORTAL_ALLOWED_EMAILS);
 
-  if (allowedEmails.length > 0) return allowedEmails.includes(normalizedEmail);
+  if (portalAllowedEmails.length > 0) {
+    return portalAllowedEmails.some((allowedEmail) => allowedEmail.toLowerCase() === normalizedEmail);
+  }
 
-  const domain = (process.env.PORTAL_ALLOWED_DOMAIN ?? "grupo-aftermarket.com").toLowerCase();
-  return normalizedEmail.endsWith(`@${domain}`);
+  return normalizedEmail.endsWith(`@${portalAllowedDomain.toLowerCase()}`);
 }
