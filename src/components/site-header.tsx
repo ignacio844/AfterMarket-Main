@@ -9,6 +9,7 @@ import { type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from "r
 
 const links = [
   { id: "inicio", label: "Inicio", href: "/" },
+  { id: "ejecutivo", label: "Ejecutivo", href: "/ejecutivo" },
   { id: "it", label: "IT", href: "/it" },
   { id: "wms", label: "WMS", href: "/areas/wms" },
   { id: "auditoria", label: "Auditoría", href: "/areas/auditoria" },

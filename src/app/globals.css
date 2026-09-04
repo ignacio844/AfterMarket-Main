@@ -266,6 +266,64 @@ body {
   opacity: 0.18;
 }
 
+.executive-hero {
+  transition: box-shadow 500ms ease;
+}
+
+.executive-silver-glow {
+  background: radial-gradient(circle at 80% 52%, rgba(198, 208, 216, 0.08), transparent 48%);
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.executive-silver-lines {
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.35) 24%, #000 48%);
+  transition: filter 600ms ease, transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.executive-silver-line {
+  fill: none;
+  stroke: #c6d0d8;
+  stroke-linecap: round;
+  stroke-width: 1.15;
+  opacity: 0.25;
+  transition: opacity 500ms ease, stroke-width 500ms ease;
+}
+
+.executive-silver-line-soft {
+  opacity: 0.13;
+}
+
+.executive-silver-line-bright {
+  opacity: 0.34;
+}
+
+.executive-hero:hover {
+  box-shadow: 0 24px 58px -38px rgba(117, 150, 176, 0.46);
+}
+
+.executive-hero:hover .executive-silver-glow {
+  opacity: 1;
+}
+
+.executive-hero:hover .executive-silver-lines {
+  filter: drop-shadow(0 0 3px rgba(198, 208, 216, 0.28));
+  transform: translate3d(-3px, -1px, 0);
+}
+
+.executive-hero:hover .executive-silver-line {
+  opacity: 0.42;
+  stroke-width: 1.2;
+}
+
+.executive-hero:hover .executive-silver-line-soft {
+  opacity: 0.22;
+}
+
+.executive-hero:hover .executive-silver-line-bright {
+  opacity: 0.56;
+}
+
 @keyframes weather-sun-rotate {
   to {
     transform: rotate(360deg);
@@ -322,6 +380,13 @@ body {
   .weather-rain-drop,
   .weather-star {
     animation: none !important;
+    transition: none !important;
+  }
+
+  .executive-hero,
+  .executive-silver-glow,
+  .executive-silver-lines,
+  .executive-silver-line {
     transition: none !important;
   }
 }
