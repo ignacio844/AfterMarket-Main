@@ -114,6 +114,7 @@ body {
 
 .weather-clock-card {
   isolation: isolate;
+  border-width: 2px;
   transition:
     border-color 300ms ease,
     box-shadow 300ms ease,
@@ -121,26 +122,26 @@ body {
 }
 
 .weather-theme-sunny {
-  border-color: #e9c9a9;
+  border-color: var(--blue);
   background: linear-gradient(145deg, #fffdf8 0%, #fff5e9 100%);
   color: #b85d1f;
 }
 
 .weather-theme-cloudy,
 .weather-theme-rainy {
-  border-color: #cbd4dc;
+  border-color: var(--blue);
   background: linear-gradient(145deg, #f6f8fa 0%, #e4e9ed 100%);
   color: #536473;
 }
 
 .weather-theme-night {
-  border-color: #274866;
+  border-color: var(--blue);
   background: linear-gradient(145deg, #173550 0%, #0e2841 100%);
   color: #e8f1f8;
 }
 
 .weather-theme-neutral {
-  border-color: var(--line);
+  border-color: var(--blue);
   background: linear-gradient(145deg, #ffffff 0%, #f2f6f8 100%);
   color: var(--navy);
 }
@@ -181,11 +182,11 @@ body {
   width: 112px;
   height: 112px;
   pointer-events: none;
-  transition: transform 500ms cubic-bezier(0.65, 0, 0.35, 1);
+  transition: transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .weather-clock-card:hover .weather-art {
-  transform: translate(-5px, -5px) rotate(-4deg);
+  transform: translate(-10px, -10px) scale(1.12) rotate(-5deg);
 }
 
 .weather-art-sun {
