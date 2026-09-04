@@ -173,7 +173,10 @@ export function WmsResourceExplorer({ initialModules, canManage = false, editorE
     <section className="mt-8" aria-labelledby="wms-resources-title">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--blue)]">Documentación del proyecto</p><h2 id="wms-resources-title" className="mt-2 text-2xl font-semibold tracking-[-0.03em] sm:text-3xl">Recursos WMS</h2></div>
-        {editing && <p className="rounded-full bg-[#e8f4ff] px-3 py-1.5 text-xs font-semibold text-[var(--blue)]">Publicación inmediata al guardar</p>}
+        {canManage && <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+          {editing && <p className="rounded-full bg-[#e8f4ff] px-3 py-1.5 text-xs font-semibold text-[var(--blue)]">Publicación inmediata al guardar</p>}
+          <button type="button" onClick={() => { setEditing((current) => !current); setCreatingModule(false); setFeedback(null); }} className={`flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold transition ${editing ? "bg-[var(--blue)] text-white" : "bg-white text-[var(--navy)] ring-1 ring-[var(--line)] hover:ring-[var(--blue)]/40"}`}>{editing ? <X className="size-4" /> : <Settings2 className="size-4" />}{editing ? "Finalizar edición" : "Administrar recursos"}</button>
+        </div>}
       </div>
 
       <div className="grid overflow-hidden rounded-[28px] border border-[var(--line)] bg-white shadow-[0_24px_60px_-45px_rgba(14,40,65,0.45)] lg:grid-cols-[270px_minmax(0,1fr)]">
@@ -186,10 +189,9 @@ export function WmsResourceExplorer({ initialModules, canManage = false, editorE
             })}
           </div>
 
-          {canManage && <div className="mt-3 border-t border-[var(--line)] pt-3 lg:mt-auto">
-            {editing && <button type="button" onClick={() => setCreatingModule(true)} className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-xs font-semibold text-[var(--navy)] transition hover:border-[var(--blue)]"><Plus className="size-4" />Nuevo módulo</button>}
-            <button type="button" onClick={() => { setEditing((current) => !current); setCreatingModule(false); setFeedback(null); }} className={`flex w-full items-center justify-center gap-2 rounded-xl px-3 py-3 text-xs font-semibold transition ${editing ? "bg-[var(--blue)] text-white" : "bg-white text-[var(--navy)] ring-1 ring-[var(--line)] hover:ring-[var(--blue)]/40"}`}>{editing ? <X className="size-4" /> : <Settings2 className="size-4" />}{editing ? "Finalizar edición" : "Administrar recursos"}</button>
-            {editing && editorEmail && <p className="mt-2 truncate px-2 text-center text-[10px] text-[var(--muted)]">{editorEmail}</p>}
+          {canManage && editing && <div className="mt-3 border-t border-[var(--line)] pt-3 lg:mt-auto">
+            <button type="button" onClick={() => setCreatingModule(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-xs font-semibold text-[var(--navy)] transition hover:border-[var(--blue)]"><Plus className="size-4" />Nuevo módulo</button>
+            {editorEmail && <p className="mt-2 truncate px-2 text-center text-[10px] text-[var(--muted)]">{editorEmail}</p>}
           </div>}
         </nav>
 
