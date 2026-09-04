@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useCurrentUser } from "@/components/current-user-provider";
 import { HomeCalendarStrip } from "@/components/home-calendar-strip";
 import { WeatherClockCard } from "@/components/weather-clock-card";
 import { defaultHomeAccessIds, portalAccesses } from "@/lib/portal-data";
@@ -20,7 +21,7 @@ function getTimeData(date: Date) {
       .find((part) => part.type === "hour")?.value ?? "0",
   );
   return {
-    greeting: hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches",
+    greeting: hour < 12 ? "Buen día" : hour < 19 ? "Buenas tardes" : "Buenas noches",
     time: new Intl.DateTimeFormat("es-AR", {
       hour: "2-digit",
       minute: "2-digit",
@@ -31,6 +32,7 @@ function getTimeData(date: Date) {
 }
 
 export default function Home() {
+  const { firstName } = useCurrentUser();
   const [now, setNow] = useState<Date | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>(defaultHomeAccessIds);
 
@@ -87,7 +89,7 @@ export default function Home() {
             <div className="absolute right-12 top-16 size-28 rounded-full border border-white/10" />
             <div className="relative max-w-3xl">
               <h1 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
-                {timeData?.greeting ?? "Buenos días"}, Ignacio.
+                {timeData?.greeting ?? "Buen día"}, {firstName}.
               </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55">
                 Tus herramientas y accesos de trabajo, organizados en un solo lugar.
