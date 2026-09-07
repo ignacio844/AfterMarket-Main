@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ExternalLink, MapPinned, ReceiptText } from "lucide-react";
+import { ExecutiveCalendarIndicator } from "@/components/executive-indicator-calendar";
 
 const executiveApps = [
   {
@@ -80,6 +81,8 @@ export default function EjecutivoPage() {
             })}
           </div>
         </section>
+
+        <ExecutiveCalendarIndicator />
       </main>
     </div>
   );

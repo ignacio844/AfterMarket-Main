@@ -6,13 +6,17 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "bridge:start": "node --env-file=.env.bridge bridge/server.mjs",
+    "bridge:supervise": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-executive-bridge.ps1",
+    "bridge:install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/register-executive-bridge-task.ps1"
   },
   "dependencies": {
     "@radix-ui/react-popover": "^1.1.23",
     "@supabase/supabase-js": "^2.113.0",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.39.0",
+    "mssql": "^12.7.0",
     "next": "16.3.4",
     "next-auth": "^5.0.0-beta.32",
     "react": "19.2.8",

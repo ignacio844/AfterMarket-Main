@@ -1,6 +1,12 @@
 "use client";
 
-import { DayPicker, type ClassNames, type DayPickerProps } from "react-day-picker";
+import {
+  DayButton,
+  DayPicker,
+  type ClassNames,
+  type DayButtonProps,
+  type DayPickerProps,
+} from "react-day-picker";
 import { es } from "react-day-picker/locale";
 
 const baseClassNames = {
@@ -49,4 +55,8 @@ export function Calendar({ className, classNames, ...props }: DayPickerProps) {
       {...props}
     />
   );
+}
+
+export function CalendarDayButton(props: DayButtonProps) {
+  return <DayButton {...props} />;
 }

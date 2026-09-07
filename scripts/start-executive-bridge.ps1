@@ -1,0 +1,128 @@
+$ErrorActionPreference = 'Stop'
+
+$projectRoot = Split-Path -Parent $PSScriptRoot
+$auditRoot = 'C:\Users\Auditoria\Desktop\AUDITORIAS\GRUPO AFTERMARKET\REACT\AUDITORIA.BESTIA\sistema-auditoria'
+$runtimeDirectory = Join-Path $projectRoot '.runtime'
+$bridgeEnvironment = Join-Path $projectRoot '.env.bridge'
+$auditBridgeEnvironment = Join-Path $auditRoot '.env.bridge'
+$supervisorLog = Join-Path $runtimeDirectory 'shared-bridge-supervisor.log'
+$ngrokPublicUrl = 'https://surgical-dean-overtime.ngrok-free.dev'
+
+New-Item -ItemType Directory -Path $runtimeDirectory -Force | Out-Null
+
+function Write-SupervisorLog {
+  param([string]$Message)
+  $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+  Add-Content -LiteralPath $supervisorLog -Value "[$timestamp] $Message"
+}
+
+function Test-Endpoint {
+  param([string]$Uri)
+  try {
+    $response = Invoke-WebRequest -Uri $Uri -UseBasicParsing -TimeoutSec 5
+    return $response.StatusCode -eq 200
+  } catch {
+    return $false
+  }
+}
+
+function Start-NodeProcess {
+  param(
+    [string]$WorkingDirectory,
+    [string[]]$Arguments,
+    [string]$LogPrefix
+  )
+
+  $nodePath = (Get-Command node.exe -ErrorAction Stop).Source
+  Start-Process `
+    -FilePath $nodePath `
+    -ArgumentList $Arguments `
+    -WorkingDirectory $WorkingDirectory `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput (Join-Path $runtimeDirectory "$LogPrefix.out.log") `
+    -RedirectStandardError (Join-Path $runtimeDirectory "$LogPrefix.error.log")
+}
+
+function Start-AuditBridge {
+  if (-not (Test-Path -LiteralPath $auditBridgeEnvironment)) {
+    throw "No se encontró $auditBridgeEnvironment"
+  }
+  Start-NodeProcess -WorkingDirectory $auditRoot -Arguments @('--env-file=.env.bridge', 'bridge/server.mjs') -LogPrefix 'audit-bridge'
+  Write-SupervisorLog 'Bridge de Auditoría iniciado en 8787.'
+}
+
+function Start-ExecutiveBridge {
+  if (-not (Test-Path -LiteralPath $bridgeEnvironment)) {
+    throw "No se encontró $bridgeEnvironment"
+  }
+  Start-NodeProcess -WorkingDirectory $projectRoot -Arguments @('--env-file=.env.bridge', 'bridge/server.mjs') -LogPrefix 'executive-bridge'
+  Write-SupervisorLog 'Bridge Ejecutivo iniciado en 8788.'
+}
+
+function Start-Gateway {
+  Start-NodeProcess -WorkingDirectory $projectRoot -Arguments @('bridge/gateway.mjs') -LogPrefix 'bridge-gateway'
+  Write-SupervisorLog 'Gateway compartido iniciado en 8790.'
+}
+
+function Get-NgrokTunnel {
+  try {
+    $response = Invoke-RestMethod -Uri 'http://127.0.0.1:4040/api/tunnels' -TimeoutSec 5
+    return $response.tunnels | Select-Object -First 1
+  } catch {
+    return $null
+  }
+}
+
+function Start-Ngrok {
+  $ngrokPath = (Get-Command ngrok.exe -ErrorAction Stop).Source
+  Start-Process `
+    -FilePath $ngrokPath `
+    -ArgumentList @('http', '8790', '--url', $ngrokPublicUrl, '--log', 'stdout', '--log-format', 'json') `
+    -WorkingDirectory $projectRoot `
+    -WindowStyle Hidden `
+    -RedirectStandardOutput (Join-Path $runtimeDirectory 'ngrok.out.log') `
+    -RedirectStandardError (Join-Path $runtimeDirectory 'ngrok.error.log')
+  Write-SupervisorLog "ngrok iniciado: $ngrokPublicUrl -> 8790."
+}
+
+function Ensure-Service {
+  param(
+    [string]$HealthUri,
+    [scriptblock]$StartAction,
+    [string]$ServiceName
+  )
+
+  if (Test-Endpoint $HealthUri) { return }
+  try {
+    & $StartAction
+    Start-Sleep -Seconds 5
+    if (-not (Test-Endpoint $HealthUri)) {
+      Write-SupervisorLog "$ServiceName se inició, pero aún no responde."
+    }
+  } catch {
+    Write-SupervisorLog "No se pudo iniciar ${ServiceName}: $($_.Exception.Message)"
+  }
+}
+
+Write-SupervisorLog 'Supervisor compartido iniciado.'
+
+while ($true) {
+  Ensure-Service -HealthUri 'http://127.0.0.1:8787/health' -StartAction ${function:Start-AuditBridge} -ServiceName 'bridge de Auditoría'
+  Ensure-Service -HealthUri 'http://127.0.0.1:8788/health' -StartAction ${function:Start-ExecutiveBridge} -ServiceName 'bridge Ejecutivo'
+  Ensure-Service -HealthUri 'http://127.0.0.1:8790/health' -StartAction ${function:Start-Gateway} -ServiceName 'gateway compartido'
+
+  $tunnel = Get-NgrokTunnel
+  if (-not $tunnel) {
+    try {
+      Start-Ngrok
+      Start-Sleep -Seconds 5
+    } catch {
+      Write-SupervisorLog "No se pudo iniciar ngrok: $($_.Exception.Message)"
+    }
+  } elseif ($tunnel.config.addr -notmatch ':8790$') {
+    Write-SupervisorLog "Advertencia: ngrok está activo pero apunta a $($tunnel.config.addr), no a 8790."
+  }
+
+  # Los controles HTTP no realizan consultas SQL.
+  Start-Sleep -Seconds 60
+}
