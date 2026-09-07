@@ -3,28 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DayButtonProps } from "react-day-picker";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
-import type { DailyLinesMetric, DailyLinesResponse } from "@/lib/executive-lines";
+import type { DailyLinesClass, DailyLinesMetric, DailyLinesResponse } from "@/lib/executive-lines";
 
 type RequestState = "loading" | "ready" | "empty" | "error";
 const TWO_HOURS_MS = 2 * 60 * 60 * 1_000;
-
-const classificationStyles = {
-  A: "text-emerald-700",
-  B: "text-amber-600",
-  C: "text-red-600",
-} as const;
-
-const classificationLabels = {
-  A: "Sobre el promedio",
-  B: "Dentro del promedio",
-  C: "Debajo del promedio",
-} as const;
+const classText = { A: "text-emerald-700", B: "text-amber-600", C: "text-red-600" } as const;
+const classColor = { A: "#059669", B: "#d97706", C: "#dc2626" } as const;
+const classLabel = { A: "Sobre el promedio", B: "Dentro del promedio", C: "Debajo del promedio" } as const;
 
 function dateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 function monthRange(month: Date) {
@@ -34,36 +22,123 @@ function monthRange(month: Date) {
   };
 }
 
-function ExecutiveCalendarDayButton({
-  metric,
-  children,
-  modifiers,
-  day,
-  className,
-  style,
-  ...props
-}: DayButtonProps & { metric?: DailyLinesMetric }) {
-  const metricStyle = metric ? classificationStyles[metric.classification] : "text-slate-300";
+function classification(lines: number, average: number): DailyLinesClass {
+  const ratio = average ? lines / average : 1;
+  return ratio >= 1.1 ? "A" : ratio >= 0.8 ? "B" : "C";
+}
+
+function shortDate(value: string) {
+  return new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short" })
+    .format(new Date(`${value}T12:00:00`)).replace(".", "");
+}
+
+function smoothPath(points: Array<{ x: number; y: number }>) {
+  if (!points.length) return "";
+  return points.slice(1).reduce((path, point, index) => {
+    const previous = points[index];
+    const midX = (previous.x + point.x) / 2;
+    return `${path} C ${midX} ${previous.y}, ${midX} ${point.y}, ${point.x} ${point.y}`;
+  }, `M ${points[0].x} ${points[0].y}`);
+}
+
+function TrendChart({ days }: { days: DailyLinesMetric[] }) {
+  const recent = useMemo(() => [...days].sort((a, b) => a.date.localeCompare(b.date)).slice(-30), [days]);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  if (!recent.length) return null;
+
+  const average = recent.reduce((total, day) => total + day.lines, 0) / recent.length;
+  const first = recent[0];
+  const last = recent[recent.length - 1];
+  const width = 430;
+  const height = 206;
+  const top = 18;
+  const bottom = 30;
+  const side = 14;
+  const chartHeight = height - top - bottom;
+  const values = recent.map((day) => day.lines);
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const spread = Math.max(rawMax - rawMin, rawMax * 0.18, 1);
+  const min = Math.max(0, rawMin - spread * 0.22);
+  const max = rawMax + spread * 0.22;
+  const points = recent.map((day, index) => ({
+    x: side + (recent.length === 1 ? (width - side * 2) / 2 : (index / (recent.length - 1)) * (width - side * 2)),
+    y: top + ((max - day.lines) / (max - min)) * chartHeight,
+  }));
+  const line = smoothPath(points);
+  const area = `${line} L ${points.at(-1)!.x} ${height - bottom} L ${points[0].x} ${height - bottom} Z`;
+  const averageY = top + ((max - average) / (max - min)) * chartHeight;
+  const hoveredDay = hoveredIndex === null ? null : recent[hoveredIndex];
+  const hoveredPoint = hoveredIndex === null ? null : points[hoveredIndex];
+  const tooltipWidth = 164;
+  const tooltipHeight = 68;
+  const tooltipX = hoveredPoint ? Math.min(Math.max(hoveredPoint.x - tooltipWidth / 2, side), width - side - tooltipWidth) : 0;
+  const tooltipY = hoveredPoint ? (hoveredPoint.y < 92 ? hoveredPoint.y + 14 : hoveredPoint.y - tooltipHeight - 12) : 0;
 
   return (
-    <CalendarDayButton
-      day={day}
-      modifiers={modifiers}
-      className={`${className ?? ""} !flex flex-col items-center justify-center gap-0.5 text-center`}
-      style={{ ...style, width: "min(100%, 72px)", marginInline: "auto" }}
-      title={metric ? `${metric.lines} renglones · ${metric.orders} pedidos` : "Sin actividad registrada"}
-      {...props}
-    >
+    <div>
+      <div className="mb-3">
+        <div className="w-fit min-w-36 rounded-xl border border-white/80 bg-white/70 px-3 py-2.5">
+          <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-[var(--muted)]">Promedio</p>
+          <p className="mt-1 text-lg font-semibold tracking-[-0.03em] text-[var(--navy)]">{Math.round(average).toLocaleString("es-AR")}</p>
+        </div>
+      </div>
+      <div className="rounded-[15px] border border-white/90 bg-white/75 px-1.5 pb-1 pt-2">
+        <svg viewBox={`0 0 ${width} ${height}`} className="block h-auto w-full" role="img" aria-label={`Evolución de los últimos ${recent.length} días con actividad`}>
+          <defs>
+            <linearGradient id="executive-trend-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#2a668f" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#2a668f" stopOpacity="0.015" />
+            </linearGradient>
+          </defs>
+          {[0, 0.5, 1].map((position) => <line key={position} x1={side} x2={width - side} y1={top + chartHeight * position} y2={top + chartHeight * position} stroke="#dfe5ea" strokeDasharray="3 6" />)}
+          <line x1={side} x2={width - side} y1={averageY} y2={averageY} stroke="#718596" strokeDasharray="5 5" opacity="0.65" />
+          <path d={area} fill="url(#executive-trend-fill)" />
+          <path d={line} fill="none" stroke="#2a668f" strokeWidth="2.6" strokeLinecap="round" />
+          {points.map((point, index) => {
+            const day = recent[index];
+            const isHovered = hoveredIndex === index;
+            const dayClass = classification(day.lines, average);
+            return (
+              <g
+                key={day.date}
+                role="button"
+                tabIndex={0}
+                aria-label={`${shortDate(day.date)}, ${day.lines.toLocaleString("es-AR")} renglones, ${day.orders.toLocaleString("es-AR")} pedidos, ${classLabel[dayClass]}`}
+                className="cursor-pointer outline-none"
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                onFocus={() => setHoveredIndex(index)}
+                onBlur={() => setHoveredIndex(null)}
+              >
+                {isHovered && <circle cx={point.x} cy={point.y} r="10" fill={classColor[dayClass]} opacity="0.14" />}
+                <circle cx={point.x} cy={point.y} r={isHovered ? 5.4 : 3.2} fill={classColor[dayClass]} stroke="white" strokeWidth={isHovered ? 2.5 : 1.8} className="transition-all duration-150" />
+                <circle cx={point.x} cy={point.y} r="11" fill="transparent" />
+              </g>
+            );
+          })}
+          {hoveredDay && hoveredPoint && (
+            <g pointerEvents="none">
+              <line x1={hoveredPoint.x} x2={hoveredPoint.x} y1={top} y2={height - bottom} stroke="#2a668f" strokeWidth="1" strokeDasharray="3 4" opacity="0.32" />
+              <rect x={tooltipX} y={tooltipY} width={tooltipWidth} height={tooltipHeight} rx="10" fill="#0e2841" opacity="0.97" />
+              <text x={tooltipX + 12} y={tooltipY + 18} fill="#b9d3e5" fontSize="9" fontWeight="700" letterSpacing="0.7">{shortDate(hoveredDay.date).toUpperCase()}</text>
+              <text x={tooltipX + 12} y={tooltipY + 38} fill="white" fontSize="13" fontWeight="700">{hoveredDay.lines.toLocaleString("es-AR")} renglones</text>
+              <text x={tooltipX + 12} y={tooltipY + 55} fill="#d4dee6" fontSize="9.5">{hoveredDay.orders.toLocaleString("es-AR")} pedidos · {classLabel[classification(hoveredDay.lines, average)]}</text>
+            </g>
+          )}
+          <text x={side} y={height - 8} fill="#687684" fontSize="10">{shortDate(first.date)}</text>
+          <text x={width - side} y={height - 8} fill="#687684" fontSize="10" textAnchor="end">{shortDate(last.date)}</text>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function ExecutiveDayButton({ metric, children, modifiers, day, className, style, ...props }: DayButtonProps & { metric?: DailyLinesMetric }) {
+  return (
+    <CalendarDayButton day={day} modifiers={modifiers} className={`${className ?? ""} !flex flex-col items-center justify-center gap-0.5 text-center`} style={{ ...style, width: "min(100%, 72px)", marginInline: "auto" }} title={metric ? `${metric.lines} renglones · ${metric.orders} pedidos` : "Sin actividad registrada"} {...props}>
       <span className="leading-none">{children}</span>
-      {!modifiers.outside && (
-        <span
-          className={`text-[10px] font-bold leading-none sm:text-[11px] ${
-            modifiers.selected ? "text-white/70" : metricStyle
-          }`}
-        >
-          {metric ? metric.lines.toLocaleString("es-AR") : "—"}
-        </span>
-      )}
+      {!modifiers.outside && <span className={`text-[10px] font-bold leading-none sm:text-[11px] ${modifiers.selected ? "text-white/70" : metric ? classText[metric.classification] : "text-slate-300"}`}>{metric ? metric.lines.toLocaleString("es-AR") : "—"}</span>}
     </CalendarDayButton>
   );
 }
@@ -73,179 +148,98 @@ export function ExecutiveCalendarIndicator() {
   const [date, setDate] = useState<Date | undefined>(today);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [data, setData] = useState<DailyLinesResponse | null>(null);
+  const [trendData, setTrendData] = useState<DailyLinesResponse | null>(null);
   const [requestState, setRequestState] = useState<RequestState>("loading");
+  const [trendState, setTrendState] = useState<RequestState>("loading");
   const [retry, setRetry] = useState(0);
   const range = useMemo(() => monthRange(month), [month]);
+  const trendRange = useMemo(() => {
+    const from = new Date(today);
+    from.setDate(from.getDate() - 92);
+    return { from: dateKey(from), to: dateKey(today) };
+  }, [today]);
 
   useEffect(() => {
     const controller = new AbortController();
-
-    async function loadMetrics() {
-      try {
-        const params = new URLSearchParams(range);
-        const response = await fetch(`/api/executive/daily-lines?${params}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = await response.json() as DailyLinesResponse & { error?: string };
-        if (!response.ok) throw new Error(payload.error ?? "No se pudieron consultar los indicadores.");
-        setData(payload);
-        setRequestState(payload.days.length ? "ready" : "empty");
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        console.error("Error cargando renglones diarios:", error);
+    async function getMetrics(target: { from: string; to: string }) {
+      const response = await fetch(`/api/executive/daily-lines?${new URLSearchParams(target)}`, { cache: "no-store", signal: controller.signal });
+      const payload = await response.json() as DailyLinesResponse & { error?: string };
+      if (!response.ok) throw new Error(payload.error ?? "No se pudieron consultar los indicadores.");
+      return payload;
+    }
+    async function load() {
+      const [calendarResult, trendResult] = await Promise.allSettled([getMetrics(range), getMetrics(trendRange)]);
+      if (controller.signal.aborted) return;
+      if (calendarResult.status === "fulfilled") {
+        setData(calendarResult.value);
+        setRequestState(calendarResult.value.days.length ? "ready" : "empty");
+      } else {
+        console.error("Error cargando renglones diarios:", calendarResult.reason);
         setData(null);
         setRequestState("error");
       }
+      if (trendResult.status === "fulfilled") {
+        setTrendData(trendResult.value);
+        setTrendState(trendResult.value.days.length ? "ready" : "empty");
+      } else {
+        console.error("Error cargando evolución:", trendResult.reason);
+        setTrendData(null);
+        setTrendState("error");
+      }
     }
+    void load();
+    const timer = window.setInterval(() => void load(), TWO_HOURS_MS);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [range, retry, trendRange]);
 
-    void loadMetrics();
-    const refreshTimer = window.setInterval(() => void loadMetrics(), TWO_HOURS_MS);
-    return () => {
-      controller.abort();
-      window.clearInterval(refreshTimer);
-    };
-  }, [range, retry]);
+  const metrics = useMemo(() => new Map(data?.days.map((metric) => [metric.date, metric]) ?? []), [data]);
+  const selected = date ? metrics.get(dateKey(date)) : undefined;
+  const selectedLabel = date ? new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date) : null;
+  const updatedAt = trendData?.updatedAt ?? data?.updatedAt;
+  const updatedLabel = updatedAt ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(updatedAt)) : null;
+  const DayButton = useCallback((props: DayButtonProps) => <ExecutiveDayButton {...props} metric={metrics.get(dateKey(props.day.date))} />, [metrics]);
 
-  const metricsByDate = useMemo(
-    () => new Map(data?.days.map((metric) => [metric.date, metric]) ?? []),
-    [data],
-  );
-  const selectedMetric = date ? metricsByDate.get(dateKey(date)) : undefined;
-  const selectedDateLabel = date
-    ? new Intl.DateTimeFormat("es-AR", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }).format(date)
-    : null;
-  const lastUpdatedLabel = data?.updatedAt
-    ? new Intl.DateTimeFormat("es-AR", {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(new Date(data.updatedAt))
-    : null;
-
-  const DayButton = useCallback(
-    (props: DayButtonProps) => (
-      <ExecutiveCalendarDayButton {...props} metric={metricsByDate.get(dateKey(props.day.date))} />
-    ),
-    [metricsByDate],
-  );
-
-  function handleMonthChange(nextMonth: Date) {
-    setMonth(nextMonth);
-    setData(null);
+  function retryConnection() {
     setRequestState("loading");
+    setTrendState("loading");
+    setRetry((value) => value + 1);
   }
 
   return (
-    <section className="mx-auto mt-5 w-full max-w-[920px]" aria-labelledby="executive-indicators-title">
+    <section className="mt-5 w-full" aria-labelledby="executive-indicators-title">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3 px-1">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-[var(--blue)]">Información central</p>
-          <h2 id="executive-indicators-title" className="mt-1 text-xl font-semibold tracking-[-0.025em] text-[var(--navy)]">
-            Indicadores ejecutivos
-          </h2>
+          <h2 id="executive-indicators-title" className="mt-1 text-xl font-semibold tracking-[-0.025em] text-[var(--navy)]">Indicadores ejecutivos</h2>
         </div>
-        <span className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
-          {lastUpdatedLabel
-            ? `Última actualización · ${lastUpdatedLabel}`
-            : requestState === "loading"
-              ? "Leyendo última actualización"
-              : "Actualización no disponible"}
-        </span>
+        <span className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">{updatedLabel ? `Última actualización · ${updatedLabel}` : requestState === "loading" ? "Leyendo última actualización" : "Actualización no disponible"}</span>
       </div>
 
       <article className="rounded-[24px] border border-[var(--line)] bg-white p-4 shadow-[0_18px_48px_-40px_rgba(14,40,65,0.5)] sm:p-5">
-        <div className="grid grid-cols-[minmax(0,1fr)_210px] gap-4 max-[520px]:grid-cols-1">
-          <div className="min-w-0">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.85fr)]">
+          <div className="min-w-0 lg:pr-1">
             <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--navy)]">Renglones por día</h3>
-                <p className="mt-1 text-xs text-[var(--muted)]">Cantidad de códigos procesados por pedido.</p>
-              </div>
-              <div className="flex items-center gap-2 text-[9px] font-semibold text-[var(--muted)]" aria-label="Escala de rendimiento">
-                <span><i className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />A</span>
-                <span><i className="mr-1 inline-block size-1.5 rounded-full bg-amber-400" />B</span>
-                <span><i className="mr-1 inline-block size-1.5 rounded-full bg-red-500" />C</span>
-              </div>
+              <div><h3 className="text-sm font-semibold text-[var(--navy)]">Renglones por día</h3><p className="mt-1 text-xs text-[var(--muted)]">Cantidad de códigos procesados por pedido.</p></div>
+              <div className="flex items-center gap-2 text-[9px] font-semibold text-[var(--muted)]" aria-label="Escala de rendimiento"><span><i className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />A</span><span><i className="mr-1 inline-block size-1.5 rounded-full bg-amber-400" />B</span><span><i className="mr-1 inline-block size-1.5 rounded-full bg-red-500" />C</span></div>
             </div>
-
-            <Calendar
-              mode="single"
-              month={month}
-              onMonthChange={handleMonthChange}
-              selected={date}
-              onSelect={setDate}
-              showOutsideDays={false}
-              timeZone="America/Argentina/Buenos_Aires"
-              noonSafe
-              classNames={{
-                root: "!w-full !max-w-[580px] !p-0",
-                months: "!w-full",
-                month: "!w-full !space-y-1.5",
-                month_caption: "!h-9 !justify-start px-2",
-                caption_label: "!text-base",
-                nav: "absolute right-1 top-0 flex items-center gap-1",
-                month_grid: "!w-full",
-                weekdays: "!grid !grid-cols-7",
-                weekday: "!w-auto !py-1.5",
-                week: "!mt-1 !grid !grid-cols-7",
-                day: "!h-11 !w-auto sm:!h-12",
-                day_button: "!h-11 !rounded-xl sm:!h-12",
-              }}
-              components={{ DayButton }}
-            />
+            <Calendar mode="single" month={month} onMonthChange={(next) => { setMonth(next); setData(null); setRequestState("loading"); }} selected={date} onSelect={setDate} showOutsideDays={false} timeZone="America/Argentina/Buenos_Aires" noonSafe components={{ DayButton }} classNames={{ root: "!w-full !p-0", months: "!w-full", month: "!w-full !space-y-1.5", month_caption: "!h-9 !justify-start px-2", caption_label: "!text-base", nav: "absolute right-1 top-0 flex items-center gap-1", month_grid: "!w-full", weekdays: "!grid !grid-cols-7", weekday: "!w-auto !py-1.5", week: "!mt-1 !grid !grid-cols-7", day: "!h-11 !w-auto sm:!h-12", day_button: "!h-11 !rounded-xl sm:!h-12" }} />
           </div>
 
-          <aside className="flex min-h-40 flex-col justify-between rounded-[18px] border border-[var(--line)] bg-[var(--navy-soft)]/55 p-4" aria-live="polite">
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Día seleccionado</p>
-              {selectedDateLabel ? (
-                <p className="mt-2 text-sm font-semibold capitalize leading-5 text-[var(--navy)]">{selectedDateLabel}</p>
-              ) : (
-                <p className="mt-2 text-sm text-[var(--muted)]">Seleccioná una fecha.</p>
-              )}
+          <aside className="flex min-h-[390px] flex-col rounded-[20px] border border-[var(--line)] bg-[var(--navy-soft)]/55 p-4 sm:p-5" aria-live="polite">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Últimos registros</p><h3 className="mt-1 text-sm font-semibold text-[var(--navy)]">Evolución reciente</h3></div>
+              <span className="rounded-full border border-white/90 bg-white/65 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">30 días</span>
             </div>
-
-            {selectedMetric ? (
-              <div className="mt-5 border-t border-[var(--line)] pt-3">
-                <p className={`text-2xl font-semibold tracking-[-0.035em] ${classificationStyles[selectedMetric.classification]}`}>
-                  {selectedMetric.lines.toLocaleString("es-AR")}
-                </p>
-                <p className="mt-0.5 text-[10px] font-medium text-[var(--muted)]">renglones · {selectedMetric.orders.toLocaleString("es-AR")} pedidos</p>
-                <p className={`mt-2 text-[10px] font-bold ${classificationStyles[selectedMetric.classification]}`}>
-                  {selectedMetric.classification} · {classificationLabels[selectedMetric.classification]}
-                </p>
+            <div className="mt-4 flex-1">
+              {trendState === "ready" && trendData ? <TrendChart days={trendData.days} /> : <div className="grid min-h-56 place-items-center rounded-[15px] border border-white/90 bg-white/55 px-5 text-center text-xs leading-5 text-[var(--muted)]">{trendState === "loading" ? "Preparando evolución…" : trendState === "error" ? "No se pudo consultar la evolución." : "Todavía no hay registros suficientes para mostrar."}</div>}
+            </div>
+            <div className="mt-4 border-t border-[var(--line)] pt-4">
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Día seleccionado</p>
+              <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+                <div className="min-w-0"><p className="text-xs font-semibold capitalize leading-5 text-[var(--navy)]">{selectedLabel ?? "Seleccioná una fecha."}</p>{selected && <p className={`mt-1 text-[10px] font-bold ${classText[selected.classification]}`}>{selected.classification} · {classLabel[selected.classification]}</p>}</div>
+                {selected ? <div className="text-right"><p className={`text-xl font-semibold tracking-[-0.035em] ${classText[selected.classification]}`}>{selected.lines.toLocaleString("es-AR")}</p><p className="mt-0.5 text-[9px] text-[var(--muted)]">{selected.orders.toLocaleString("es-AR")} pedidos</p></div> : requestState === "error" ? <button type="button" onClick={retryConnection} className="text-xs font-semibold text-[var(--blue)] hover:underline">Reintentar</button> : <p className="text-xs font-semibold text-[var(--navy)]">{requestState === "loading" ? "Consultando…" : "Sin actividad"}</p>}
               </div>
-            ) : requestState === "error" ? (
-              <div className="mt-5 border-t border-[var(--line)] pt-3">
-                <p className="text-xs leading-5 text-[var(--muted)]">Falta configurar o iniciar el bridge local.</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setRequestState("loading");
-                    setRetry((value) => value + 1);
-                  }}
-                  className="mt-2 text-xs font-semibold text-[var(--blue)] hover:underline"
-                >
-                  Reintentar conexión
-                </button>
-              </div>
-            ) : (
-              <div className="mt-5 border-t border-[var(--line)] pt-3">
-                <p className="text-sm font-semibold text-[var(--navy)]">
-                  {requestState === "loading" ? "Consultando…" : "Sin actividad"}
-                </p>
-                {data && data.averageLines > 0 && (
-                  <p className="mt-1 text-[10px] text-[var(--muted)]">Promedio mensual: {data.averageLines.toLocaleString("es-AR")} renglones</p>
-                )}
-              </div>
-            )}
+            </div>
           </aside>
         </div>
       </article>
