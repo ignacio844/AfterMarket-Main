@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { ExternalLink, MapPinned, ReceiptText } from "lucide-react";
+import { auth } from "@/auth";
 import { ExecutiveCalendarIndicator } from "@/components/executive-indicator-calendar";
 import { ExecutiveTopBrands } from "@/components/executive-top-brands";
+import { isExecutiveViewer } from "@/lib/portal-auth";
 
 const executiveApps = [
   {
@@ -36,7 +39,10 @@ function buenosAiresDateKey() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-export default function EjecutivoPage() {
+export default async function EjecutivoPage() {
+  const session = await auth();
+  if (!isExecutiveViewer(session?.user?.email)) notFound();
+
   const initialDate = buenosAiresDateKey();
 
   return (

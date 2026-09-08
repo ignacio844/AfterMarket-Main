@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { isExecutiveViewer } from "@/lib/portal-auth";
 import {
   buildDailyLinesResponse,
   type DailyLinesBridgeRow,
@@ -43,6 +44,9 @@ export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Debés iniciar sesión." }, { status: 401 });
+  }
+  if (!isExecutiveViewer(session.user.email)) {
+    return NextResponse.json({ error: "No tenés acceso a la información ejecutiva." }, { status: 403 });
   }
 
   try {

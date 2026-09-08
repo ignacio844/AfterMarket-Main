@@ -5,7 +5,7 @@ import Link from "next/link";
 import { LogIn, LogOut } from "lucide-react";
 import { signIn, signOut } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
-import { type MouseEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type MouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 const links = [
   { id: "inicio", label: "Inicio", href: "/" },
@@ -19,13 +19,16 @@ const links = [
   { id: "capital-humano", label: "Capital Humano", href: "/areas/capital-humano" },
 ] as const;
 
-function getActiveIndex(pathname: string) {
+type NavigationLink = (typeof links)[number];
+
+function getActiveIndex(pathname: string, navigationLinks: readonly NavigationLink[] = links) {
   if (pathname === "/") return 0;
-  const index = links.findIndex((link) => pathname === link.href || pathname.startsWith(`${link.href}/`));
+  const index = navigationLinks.findIndex((link) => pathname === link.href || pathname.startsWith(`${link.href}/`));
   return index >= 0 ? index : 0;
 }
 
 type SiteHeaderProps = {
+  canViewExecutive?: boolean;
   user?: {
     name?: string;
     email?: string;
@@ -42,18 +45,22 @@ function getInitials(name?: string, email?: string) {
     .join("");
 }
 
-export function SiteHeader({ user }: SiteHeaderProps) {
+export function SiteHeader({ user, canViewExecutive = false }: SiteHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const initialIndex = getActiveIndex(pathname);
+  const visibleLinks = useMemo(
+    () => links.filter((link) => link.id !== "ejecutivo" || canViewExecutive),
+    [canViewExecutive],
+  );
+  const initialIndex = getActiveIndex(pathname, visibleLinks);
   const [activeIndex, setActiveIndex] = useState(initialIndex);
   const linkRefs = useRef<Array<HTMLAnchorElement | null>>([]);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const [indicatorReady, setIndicatorReady] = useState(false);
 
   useEffect(() => {
-    setActiveIndex(getActiveIndex(pathname));
-  }, [pathname]);
+    setActiveIndex(getActiveIndex(pathname, visibleLinks));
+  }, [pathname, visibleLinks]);
 
   useLayoutEffect(() => {
     const element = linkRefs.current[activeIndex];
@@ -112,7 +119,7 @@ export function SiteHeader({ user }: SiteHeaderProps) {
                 : "none",
             }}
           />
-          {links.map((link, index) => (
+          {visibleLinks.map((link, index) => (
             <Link
               key={link.id}
               href={link.href}

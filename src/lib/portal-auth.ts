@@ -13,10 +13,23 @@ const portalEditors = [
   "jpajon@grupo-aftermarket.com",
 ];
 
-export function isPortalEditor(email: string | null | undefined) {
+const executiveViewers = [
+  "ignacio@grupo-aftermarket.com",
+  "etelias@grupo-aftermarket.com",
+];
+
+function includesNormalizedEmail(emails: readonly string[], email: string | null | undefined) {
   if (!email) return false;
-  const normalizedEmail = email.toLowerCase();
-  return portalEditors.some((editor) => editor.toLowerCase() === normalizedEmail);
+  const normalizedEmail = email.trim().toLowerCase();
+  return emails.some((allowedEmail) => allowedEmail.toLowerCase() === normalizedEmail);
+}
+
+export function isPortalEditor(email: string | null | undefined) {
+  return includesNormalizedEmail(portalEditors, email);
+}
+
+export function isExecutiveViewer(email: string | null | undefined) {
+  return includesNormalizedEmail(executiveViewers, email);
 }
 
 export function isPortalUserAllowed(email: string | null | undefined) {

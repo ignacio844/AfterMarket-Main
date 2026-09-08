@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { AccessGate } from "@/components/access-gate";
 import { CurrentUserProvider } from "@/components/current-user-provider";
 import { SiteHeader } from "@/components/site-header";
+import { isExecutiveViewer } from "@/lib/portal-auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const session = await auth();
+  const canViewExecutive = isExecutiveViewer(session?.user?.email);
 
   return (
     <html lang="es" className="h-full antialiased">
@@ -20,7 +22,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <CurrentUserProvider
             user={{ name: session.user.name ?? undefined, email: session.user.email ?? undefined }}
           >
-            <SiteHeader user={{ name: session.user.name ?? undefined, email: session.user.email ?? undefined }} />
+            <SiteHeader
+              user={{ name: session.user.name ?? undefined, email: session.user.email ?? undefined }}
+              canViewExecutive={canViewExecutive}
+            />
             {children}
           </CurrentUserProvider>
         ) : (
