@@ -5,6 +5,7 @@ const port = Number(process.env.GATEWAY_PORT ?? 8790);
 const routes = [
   { path: "/wms-trace", upstream: "http://127.0.0.1:8787" },
   { path: "/executive/daily-lines", upstream: "http://127.0.0.1:8788" },
+  { path: "/executive/brand-lines", upstream: "http://127.0.0.1:8788" },
 ];
 
 function respond(response, status, body) {

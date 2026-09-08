@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ExternalLink, MapPinned, ReceiptText } from "lucide-react";
 import { ExecutiveCalendarIndicator } from "@/components/executive-indicator-calendar";
+import { ExecutiveTopBrands } from "@/components/executive-top-brands";
 
 const executiveApps = [
   {
@@ -22,7 +23,22 @@ export const metadata: Metadata = {
   description: "Espacio ejecutivo del portal interno de Grupo Aftermarket.",
 };
 
+export const dynamic = "force-dynamic";
+
+function buenosAiresDateKey() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 export default function EjecutivoPage() {
+  const initialDate = buenosAiresDateKey();
+
   return (
     <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
       <main className="mx-auto max-w-[1440px] px-5 py-8 lg:px-10 lg:py-10">
@@ -82,7 +98,8 @@ export default function EjecutivoPage() {
           </div>
         </section>
 
-        <ExecutiveCalendarIndicator />
+        <ExecutiveCalendarIndicator initialDate={initialDate} />
+        <ExecutiveTopBrands />
       </main>
     </div>
   );

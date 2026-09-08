@@ -15,6 +15,11 @@ function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function dateFromKey(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day, 12);
+}
+
 function monthRange(month: Date) {
   return {
     from: dateKey(new Date(month.getFullYear(), month.getMonth(), 1)),
@@ -143,8 +148,8 @@ function ExecutiveDayButton({ metric, children, modifiers, day, className, style
   );
 }
 
-export function ExecutiveCalendarIndicator() {
-  const today = useMemo(() => new Date(), []);
+export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: string }) {
+  const today = useMemo(() => dateFromKey(initialDate), [initialDate]);
   const [date, setDate] = useState<Date | undefined>(today);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [data, setData] = useState<DailyLinesResponse | null>(null);

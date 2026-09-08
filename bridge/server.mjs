@@ -158,21 +158,33 @@ async function queryDailyLines(range) {
             FROM Renglones
           ) AS PedidosUnicos
           GROUP BY fecha
+        ),
+        Marcas AS (
+          SELECT
+            fecha,
+            LTRIM(RTRIM([Desc_familia])) AS desc_familia,
+            COUNT(*) AS marca_renglones
+          FROM Renglones
+          WHERE NULLIF(LTRIM(RTRIM([Desc_familia])), '') IS NOT NULL
+          GROUP BY fecha, LTRIM(RTRIM([Desc_familia]))
         )
         SELECT
           CONVERT(varchar(10), Totales.fecha, 23) AS fecha,
           Totales.renglones,
-          Pedidos.pedidos
+          Pedidos.pedidos,
+          Marcas.desc_familia,
+          Marcas.marca_renglones
         FROM Totales
         INNER JOIN Pedidos ON Pedidos.fecha = Totales.fecha
-        ORDER BY Totales.fecha;
+        LEFT JOIN Marcas ON Marcas.fecha = Totales.fecha
+        ORDER BY Totales.fecha, Marcas.marca_renglones DESC;
       `);
   } finally {
     await pool?.close().catch(() => undefined);
   }
 }
 
-let cache = { updatedAt: null, range: null, rows: [] };
+let cache = { updatedAt: null, range: null, rows: [], brandRows: [] };
 let refreshing = false;
 
 async function loadPersistedCache() {
@@ -185,7 +197,10 @@ async function loadPersistedCache() {
       ISO_DATE.test(stored.range.to) &&
       Array.isArray(stored.rows)
     ) {
-      cache = stored;
+      cache = {
+        ...stored,
+        brandRows: Array.isArray(stored.brandRows) ? stored.brandRows : [],
+      };
       console.log(`Caché restaurada. Última actualización: ${cache.updatedAt}`);
     }
   } catch (error) {
@@ -207,13 +222,32 @@ async function refreshCache() {
     const range = refreshRange();
     console.log(`Actualizando caché SQL desde ${range.fromText} hasta ${range.toText}...`);
     const result = await queryDailyLines(range);
+    const rowsByDate = new Map();
+    const brandRows = [];
+    for (const row of result.recordset) {
+      if (!rowsByDate.has(row.fecha)) {
+        rowsByDate.set(row.fecha, {
+          fecha: row.fecha,
+          renglones: row.renglones,
+          pedidos: row.pedidos,
+        });
+      }
+      if (typeof row.desc_familia === "string" && row.desc_familia.trim() && Number(row.marca_renglones) > 0) {
+        brandRows.push({
+          fecha: row.fecha,
+          desc_familia: row.desc_familia.trim(),
+          renglones: Number(row.marca_renglones),
+        });
+      }
+    }
     cache = {
       updatedAt: new Date().toISOString(),
       range: { from: range.fromText, to: range.toText },
-      rows: result.recordset,
+      rows: [...rowsByDate.values()],
+      brandRows,
     };
     await persistCache();
-    console.log(`Caché actualizada con ${cache.rows.length} días en ${Date.now() - startedAt} ms.`);
+    console.log(`Caché actualizada con ${cache.rows.length} días y ${cache.brandRows.length} totales diarios por familia en ${Date.now() - startedAt} ms.`);
   } catch (error) {
     console.error("No se pudo actualizar la caché; se conserva la última copia válida:", error);
   } finally {
@@ -233,7 +267,9 @@ const server = createServer((request, response) => {
       refreshing,
     });
   }
-  if (request.method !== "GET" || url.pathname !== "/executive/daily-lines") {
+  const isDailyLines = url.pathname === "/executive/daily-lines";
+  const isBrandLines = url.pathname === "/executive/brand-lines";
+  if (request.method !== "GET" || (!isDailyLines && !isBrandLines)) {
     return respond(response, 404, { error: "NOT_FOUND" });
   }
   if (!isAuthorized(request)) return respond(response, 401, { error: "UNAUTHORIZED" });
@@ -241,7 +277,8 @@ const server = createServer((request, response) => {
   try {
     const range = parseRequestRange(url);
     if (!cache.updatedAt) return respond(response, 503, { error: "CACHE_NOT_READY" });
-    const rows = cache.rows.filter((row) => row.fecha >= range.fromText && row.fecha <= range.toText);
+    const sourceRows = isBrandLines ? cache.brandRows : cache.rows;
+    const rows = sourceRows.filter((row) => row.fecha >= range.fromText && row.fecha <= range.toText);
     return respond(response, 200, {
       rows,
       range: { from: range.fromText, to: range.toText },

@@ -16,6 +16,7 @@ El gateway no reemplaza ni modifica los bridges. Sólo reenvía rutas:
 
 - `/wms-trace` hacia el bridge de Auditoría en `127.0.0.1:8787`.
 - `/executive/daily-lines` hacia el bridge Ejecutivo en `127.0.0.1:8788`.
+- `/executive/brand-lines` hacia el bridge Ejecutivo en `127.0.0.1:8788`.
 
 Cada bridge continúa validando su propio Bearer token. El supervisor compartido conserva ambos procesos, el gateway y ngrok sin abrir terminales visibles.
 
@@ -48,3 +49,11 @@ El promedio mensual considera únicamente días con actividad:
 - A, verde: 110% o más del promedio.
 - B, amarillo: desde 80% y menos de 110%.
 - C, rojo: menos de 80%.
+
+## Ranking de marcas
+
+La misma actualización SQL genera una segunda colección de caché con los renglones agrupados por fecha y `Desc_familia`. Los valores nulos, vacíos o compuestos únicamente por espacios se excluyen de esta colección. El endpoint interno `/executive/brand-lines` permite leer un rango de hasta 93 días sin ejecutar una nueva consulta SQL.
+
+La ruta autenticada del portal `/api/executive/top-brands` solicita los últimos 30 días calendario, incluyendo el día actual, consolida las familias mediante `src/lib/executive-brand-manifest.ts` y devuelve las cinco marcas con más renglones. Las coincidencias del manifiesto se realizan por palabras o expresiones completas, sin distinguir mayúsculas ni tildes. Las familias que todavía no tengan una regla explícita conservan su descripción y continúan participando del ranking.
+
+El ranking mantiene el mismo criterio que el calendario: un artículo del mismo pedido puede volver a contarse si aparece en otro comprobante. No suma unidades de `cantidad` ni modifica los filtros actuales de cliente y pedido.
