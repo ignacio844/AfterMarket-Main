@@ -155,6 +155,29 @@ Permite:
 
 No existe historial de cambios y no se realizan eliminaciones físicas desde la interfaz.
 
+### Tracker WMS
+
+La página WMS incorpora un selector entre **Recursos WMS** y **Tracker WMS**. El tracker replica como modelo la planilla `CheckList  - Lanzamiento SGL`, pero no mantiene una conexión con Google Sheets.
+
+- Incluye 87 tareas iniciales agrupadas por proceso.
+- Conserva fecha, título, tipo, descripción, prioridad, responsable, cuatro casillas de avance, fecha de respuesta y respuesta.
+- El estado se calcula con la precedencia `Verificado > Hecho > Realizado > Realizando > No Realizado`.
+- Incluye resumen de avance, búsqueda y filtros.
+- El resumen utiliza tarjetas KPI compactas y neutras; la colorimetría de estados queda reservada a puntos y etiquetas pequeñas.
+- La tabla principal entra en el ancho disponible con siete bloques. Descripción y respuesta se consultan en un detalle desplegable por tarea.
+- Todos los usuarios autorizados del portal pueden visualizar el mismo progreso.
+- Sólo los editores WMS pueden crear, modificar u ocultar tareas.
+- Las eliminaciones son lógicas mediante `is_active = false`.
+- El cliente actualiza la información al enfocar la pestaña y cada 20 segundos.
+
+La migración correspondiente es:
+
+```text
+supabase/migrations/002_wms_tracker.sql
+```
+
+La migración quedó aplicada en el proyecto Supabase vinculado al portal el 09/09/2026. La página carga las 87 tareas desde la base compartida y habilita la edición para los usuarios autorizados.
+
 Editores autorizados, comparados sin distinguir mayúsculas:
 
 - ignacio@grupo-aftermarket.com
@@ -201,6 +224,7 @@ Tablas creadas:
 
 - `portal_aftermarket.wms_modules`
 - `portal_aftermarket.wms_resources`
+- `portal_aftermarket.wms_tracker_tasks` mediante la migración `002_wms_tracker.sql`
 
 La migración fue diseñada para no sobrescribir información existente del proyecto Supabase:
 
@@ -259,12 +283,18 @@ src/components/access-gate.tsx
 src/components/site-header.tsx
 src/components/wms-hero.tsx
 src/components/wms-resource-explorer.tsx
+src/components/wms-workspace.tsx
+src/components/wms-tracker.tsx
 src/lib/portal-auth.ts
 src/lib/supabase-admin.ts
 src/lib/wms-data.ts
 src/lib/wms-seed.ts
 src/lib/wms-types.ts
+src/lib/wms-tracker-data.ts
+src/lib/wms-tracker-seed.ts
+src/lib/wms-tracker-types.ts
 supabase/migrations/001_portal_aftermarket_wms.sql
+supabase/migrations/002_wms_tracker.sql
 ```
 
 ## Consideraciones para continuar
