@@ -61,7 +61,7 @@ export function ExecutiveTopBrands() {
         <div className="flex flex-wrap items-end justify-between gap-4 px-1">
           <div>
             <h2 id="executive-brands-title" className="text-xl font-semibold tracking-[-0.025em] text-[var(--navy)]">Marcas más vendidas</h2>
-            <p className="mt-1 text-xs text-[var(--muted)]">Participación por renglones durante los últimos 30 días.</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">Participación por líneas durante los últimos 30 días.</p>
           </div>
           <div className="text-right">
             {data?.updatedAt && <p className="text-[10px] font-medium text-[var(--muted)]">Valores actualizados a {formatUpdatedAt(data.updatedAt)}</p>}
@@ -98,7 +98,7 @@ export function ExecutiveTopBrands() {
                     <p className="text-lg font-semibold tracking-[-0.03em] text-[var(--navy)]">{brand.lines.toLocaleString("es-AR")}</p>
                     <p className="text-[10px] font-bold text-[var(--blue)]">{brand.share.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%</p>
                   </div>
-                  <span className="sr-only">renglones</span>
+                  <span className="sr-only">líneas</span>
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white">
                     <div className="h-full rounded-full bg-[var(--blue)] transition-[width] duration-500" style={{ width: `${brand.share}%` }} />
                   </div>

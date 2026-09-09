@@ -89,6 +89,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "El bridge remoto debe utilizar HTTPS." }, { status: 503 });
     }
     console.error("Error consultando indicadores ejecutivos:", cause);
-    return NextResponse.json({ error: "No se pudieron consultar los renglones en este momento." }, { status: 502 });
+    return NextResponse.json({ error: "No se pudieron consultar las líneas en este momento." }, { status: 502 });
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { DayButtonProps } from "react-day-picker";
+import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
+import type { DayButtonProps, WeekProps } from "react-day-picker";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import type { DailyLinesClass, DailyLinesMetric, DailyLinesResponse } from "@/lib/executive-lines";
 
@@ -25,6 +25,20 @@ function monthRange(month: Date) {
     from: dateKey(new Date(month.getFullYear(), month.getMonth(), 1)),
     to: dateKey(new Date(month.getFullYear(), month.getMonth() + 1, 0)),
   };
+}
+
+function calendarWeekRange(month: Date) {
+  const from = new Date(month.getFullYear(), month.getMonth(), 1, 12);
+  const to = new Date(month.getFullYear(), month.getMonth() + 1, 0, 12);
+  from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
+  to.setDate(to.getDate() + (6 - ((to.getDay() + 6) % 7)));
+  return { from: dateKey(from), to: dateKey(to) };
+}
+
+function longShortDate(date: Date) {
+  return new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short" })
+    .format(date)
+    .replace(".", "");
 }
 
 function classification(lines: number, average: number): DailyLinesClass {
@@ -109,7 +123,7 @@ function TrendChart({ days }: { days: DailyLinesMetric[] }) {
                 key={day.date}
                 role="button"
                 tabIndex={0}
-                aria-label={`${shortDate(day.date)}, ${day.lines.toLocaleString("es-AR")} renglones, ${day.orders.toLocaleString("es-AR")} pedidos, ${classLabel[dayClass]}`}
+                aria-label={`${shortDate(day.date)}, ${day.lines.toLocaleString("es-AR")} líneas, ${day.orders.toLocaleString("es-AR")} pedidos, ${classLabel[dayClass]}`}
                 className="cursor-pointer outline-none"
                 onMouseEnter={() => setHoveredIndex(index)}
                 onMouseLeave={() => setHoveredIndex(null)}
@@ -127,7 +141,7 @@ function TrendChart({ days }: { days: DailyLinesMetric[] }) {
               <line x1={hoveredPoint.x} x2={hoveredPoint.x} y1={top} y2={height - bottom} stroke="#2a668f" strokeWidth="1" strokeDasharray="3 4" opacity="0.32" />
               <rect x={tooltipX} y={tooltipY} width={tooltipWidth} height={tooltipHeight} rx="10" fill="#0e2841" opacity="0.97" />
               <text x={tooltipX + 12} y={tooltipY + 18} fill="#b9d3e5" fontSize="9" fontWeight="700" letterSpacing="0.7">{shortDate(hoveredDay.date).toUpperCase()}</text>
-              <text x={tooltipX + 12} y={tooltipY + 38} fill="white" fontSize="13" fontWeight="700">{hoveredDay.lines.toLocaleString("es-AR")} renglones</text>
+              <text x={tooltipX + 12} y={tooltipY + 38} fill="white" fontSize="13" fontWeight="700">{hoveredDay.lines.toLocaleString("es-AR")} líneas</text>
               <text x={tooltipX + 12} y={tooltipY + 55} fill="#d4dee6" fontSize="9.5">{hoveredDay.orders.toLocaleString("es-AR")} pedidos · {classLabel[classification(hoveredDay.lines, average)]}</text>
             </g>
           )}
@@ -141,10 +155,65 @@ function TrendChart({ days }: { days: DailyLinesMetric[] }) {
 
 function ExecutiveDayButton({ metric, children, modifiers, day, className, style, ...props }: DayButtonProps & { metric?: DailyLinesMetric }) {
   return (
-    <CalendarDayButton day={day} modifiers={modifiers} className={`${className ?? ""} !flex flex-col items-center justify-center gap-0.5 text-center`} style={{ ...style, width: "min(100%, 72px)", marginInline: "auto" }} title={metric ? `${metric.lines} renglones · ${metric.orders} pedidos` : "Sin actividad registrada"} {...props}>
+    <CalendarDayButton day={day} modifiers={modifiers} className={`${className ?? ""} !flex flex-col items-center justify-center gap-0.5 text-center`} style={{ ...style, width: "min(100%, 72px)", marginInline: "auto" }} title={metric ? `${metric.lines} líneas · ${metric.orders} pedidos` : "Sin actividad registrada"} {...props}>
       <span className="leading-none">{children}</span>
       {!modifiers.outside && <span className={`text-[10px] font-bold leading-none sm:text-[11px] ${modifiers.selected ? "text-white/70" : metric ? classText[metric.classification] : "text-slate-300"}`}>{metric ? metric.lines.toLocaleString("es-AR") : "—"}</span>}
     </CalendarDayButton>
+  );
+}
+
+function ExecutiveWeekdays({ children, className, ...props }: ComponentProps<"tr">) {
+  return (
+    <thead aria-hidden="true">
+      <tr {...props} className={`${className ?? ""} items-center`}>
+        {children}
+        <th scope="col" className="hidden h-full items-center justify-center border-l border-[var(--line)] pl-2 text-center text-[8px] font-bold uppercase tracking-[0.08em] text-[var(--muted)] sm:flex">
+          Total
+        </th>
+      </tr>
+    </thead>
+  );
+}
+
+function ExecutiveWeek({ week, metrics, today, children, className, ...props }: WeekProps & {
+  metrics: ReadonlyMap<string, DailyLinesMetric>;
+  today: Date;
+}) {
+  const from = week.days[0].date;
+  const to = week.days.at(-1)!.date;
+  const weekMetrics = week.days
+    .map((day) => metrics.get(dateKey(day.date)))
+    .filter((metric): metric is DailyLinesMetric => Boolean(metric));
+  const lines = weekMetrics.reduce((total, metric) => total + metric.lines, 0);
+  const orders = weekMetrics.reduce((total, metric) => total + metric.orders, 0);
+  const hasActivity = weekMetrics.length > 0;
+  const todayKey = dateKey(today);
+  const isCurrentWeek = dateKey(from) <= todayKey && todayKey <= dateKey(to);
+  const rangeLabel = `${longShortDate(from)}–${longShortDate(to)}`;
+  const detail = hasActivity
+    ? `${rangeLabel}: ${lines.toLocaleString("es-AR")} líneas y ${orders.toLocaleString("es-AR")} pedidos${isCurrentWeek ? ". Semana en curso" : ""}.`
+    : `${rangeLabel}: sin actividad registrada${isCurrentWeek ? ". Semana en curso" : ""}.`;
+
+  return (
+    <tr {...props} className={`${className ?? ""} group/week rounded-xl transition-colors duration-200 hover:bg-[var(--navy-soft)]/30 focus-within:bg-[var(--navy-soft)]/30`}>
+      {children}
+      <td className="group/summary relative col-span-7 mt-1 min-w-0 border-t border-[var(--line)] pt-1 sm:col-span-1 sm:mt-0 sm:border-l sm:border-t-0 sm:pl-2 sm:pt-0">
+        <div
+          tabIndex={hasActivity || isCurrentWeek ? 0 : -1}
+          aria-label={detail}
+          className="flex min-h-8 items-center justify-between gap-2 rounded-lg bg-[var(--navy-soft)]/70 px-2 text-[var(--navy)] outline-none transition group-hover/week:bg-white focus-visible:ring-2 focus-visible:ring-[var(--blue)]/35 sm:min-h-11 sm:flex-col sm:justify-center sm:gap-0 sm:px-1"
+        >
+          <span className="text-[8px] font-bold uppercase tracking-[0.08em] text-[var(--muted)] sm:hidden">Total semanal</span>
+          <span className="text-[11px] font-semibold tracking-[-0.025em]">{hasActivity ? lines.toLocaleString("es-AR") : "—"}</span>
+          {isCurrentWeek && <span className="text-[7px] font-bold uppercase tracking-[0.08em] text-[var(--blue)]">En curso</span>}
+        </div>
+        <div aria-hidden="true" role="tooltip" className="pointer-events-none absolute bottom-[calc(100%+6px)] right-0 z-30 hidden w-52 rounded-xl bg-[var(--navy)] px-3 py-2 text-left text-[9px] font-medium leading-4 text-white opacity-0 shadow-xl transition-opacity group-hover/summary:opacity-100 group-focus-within/summary:opacity-100 sm:block">
+          <span className="block font-bold uppercase tracking-[0.1em] text-white/60">Semana · {rangeLabel}</span>
+          <span className="mt-0.5 block">{hasActivity ? `${lines.toLocaleString("es-AR")} líneas · ${orders.toLocaleString("es-AR")} pedidos` : "Sin actividad registrada"}</span>
+          {isCurrentWeek && <span className="mt-0.5 block text-white/65">Total parcial: semana en curso.</span>}
+        </div>
+      </td>
+    </tr>
   );
 }
 
@@ -153,11 +222,13 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
   const [date, setDate] = useState<Date | undefined>(today);
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [data, setData] = useState<DailyLinesResponse | null>(null);
+  const [weekData, setWeekData] = useState<DailyLinesResponse | null>(null);
   const [trendData, setTrendData] = useState<DailyLinesResponse | null>(null);
   const [requestState, setRequestState] = useState<RequestState>("loading");
   const [trendState, setTrendState] = useState<RequestState>("loading");
   const [retry, setRetry] = useState(0);
   const range = useMemo(() => monthRange(month), [month]);
+  const weekRange = useMemo(() => calendarWeekRange(month), [month]);
   const trendRange = useMemo(() => {
     const from = new Date(today);
     from.setDate(from.getDate() - 92);
@@ -173,15 +244,25 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
       return payload;
     }
     async function load() {
-      const [calendarResult, trendResult] = await Promise.allSettled([getMetrics(range), getMetrics(trendRange)]);
+      const [calendarResult, weekResult, trendResult] = await Promise.allSettled([
+        getMetrics(range),
+        getMetrics(weekRange),
+        getMetrics(trendRange),
+      ]);
       if (controller.signal.aborted) return;
       if (calendarResult.status === "fulfilled") {
         setData(calendarResult.value);
         setRequestState(calendarResult.value.days.length ? "ready" : "empty");
       } else {
-        console.error("Error cargando renglones diarios:", calendarResult.reason);
+        console.error("Error cargando líneas diarias:", calendarResult.reason);
         setData(null);
         setRequestState("error");
+      }
+      if (weekResult.status === "fulfilled") {
+        setWeekData(weekResult.value);
+      } else {
+        console.error("Error cargando totales semanales:", weekResult.reason);
+        setWeekData(null);
       }
       if (trendResult.status === "fulfilled") {
         setTrendData(trendResult.value);
@@ -195,14 +276,30 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
     void load();
     const timer = window.setInterval(() => void load(), TWO_HOURS_MS);
     return () => { controller.abort(); window.clearInterval(timer); };
-  }, [range, retry, trendRange]);
+  }, [range, retry, trendRange, weekRange]);
 
   const metrics = useMemo(() => new Map(data?.days.map((metric) => [metric.date, metric]) ?? []), [data]);
+  const weekMetrics = useMemo(() => new Map(weekData?.days.map((metric) => [metric.date, metric]) ?? []), [weekData]);
   const selected = date ? metrics.get(dateKey(date)) : undefined;
   const selectedLabel = date ? new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date) : null;
   const updatedAt = trendData?.updatedAt ?? data?.updatedAt;
   const updatedLabel = updatedAt ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(updatedAt)) : null;
   const DayButton = useCallback((props: DayButtonProps) => <ExecutiveDayButton {...props} metric={metrics.get(dateKey(props.day.date))} />, [metrics]);
+  const Week = useCallback((props: WeekProps) => <ExecutiveWeek {...props} metrics={weekMetrics} today={today} />, [today, weekMetrics]);
+  const isCurrentMonth = month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth();
+  const isAtToday = isCurrentMonth && Boolean(date && dateKey(date) === dateKey(today));
+
+  function changeMonth(next: Date) {
+    setMonth(next);
+    setData(null);
+    setWeekData(null);
+    setRequestState("loading");
+  }
+
+  function goToToday() {
+    setDate(today);
+    if (!isCurrentMonth) changeMonth(new Date(today.getFullYear(), today.getMonth(), 1, 12));
+  }
 
   function retryConnection() {
     setRequestState("loading");
@@ -224,10 +321,21 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.85fr)]">
           <div className="min-w-0 lg:pr-1">
             <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-              <div><h3 className="text-sm font-semibold text-[var(--navy)]">Renglones por día</h3><p className="mt-1 text-xs text-[var(--muted)]">Cantidad de códigos procesados por pedido.</p></div>
+              <div><h3 className="text-sm font-semibold text-[var(--navy)]">Líneas por día</h3><p className="mt-1 text-xs text-[var(--muted)]">Cantidad de códigos procesados por pedido.</p></div>
               <div className="flex items-center gap-2 text-[9px] font-semibold text-[var(--muted)]" aria-label="Escala de rendimiento"><span><i className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />A</span><span><i className="mr-1 inline-block size-1.5 rounded-full bg-amber-400" />B</span><span><i className="mr-1 inline-block size-1.5 rounded-full bg-red-500" />C</span></div>
             </div>
-            <Calendar mode="single" month={month} onMonthChange={(next) => { setMonth(next); setData(null); setRequestState("loading"); }} selected={date} onSelect={setDate} showOutsideDays={false} timeZone="America/Argentina/Buenos_Aires" noonSafe components={{ DayButton }} classNames={{ root: "!w-full !p-0", months: "!w-full", month: "!w-full !space-y-1.5", month_caption: "!h-9 !justify-start px-2", caption_label: "!text-base", nav: "absolute right-1 top-0 flex items-center gap-1", month_grid: "!w-full", weekdays: "!grid !grid-cols-7", weekday: "!w-auto !py-1.5", week: "!mt-1 !grid !grid-cols-7", day: "!h-11 !w-auto sm:!h-12", day_button: "!h-11 !rounded-xl sm:!h-12" }} />
+            <div className="relative">
+              <button
+                type="button"
+                onClick={goToToday}
+                disabled={isAtToday}
+                aria-label="Volver al día de hoy"
+                className="absolute right-[4.75rem] top-0 z-10 flex h-8 items-center rounded-lg bg-[var(--navy-soft)] px-2.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--blue)] transition hover:bg-[var(--soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]/35 disabled:cursor-default disabled:opacity-40"
+              >
+                Hoy
+              </button>
+              <Calendar mode="single" month={month} onMonthChange={changeMonth} selected={date} onSelect={setDate} showOutsideDays={false} timeZone="America/Argentina/Buenos_Aires" noonSafe components={{ DayButton, Week, Weekdays: ExecutiveWeekdays }} classNames={{ root: "!w-full !p-0", months: "!w-full", month: "!w-full !space-y-1.5", month_caption: "!h-9 !justify-start px-2", caption_label: "!text-base !text-[var(--blue)]", nav: "absolute right-1 top-0 flex items-center gap-1", button_previous: "!text-[var(--blue)]", button_next: "!text-[var(--blue)]", month_grid: "!w-full", weekdays: "!grid !grid-cols-7 sm:!grid-cols-[repeat(7,minmax(0,1fr))_76px]", weekday: "!w-auto !py-1.5", week: "!mt-1 !grid !grid-cols-7 sm:!grid-cols-[repeat(7,minmax(0,1fr))_76px]", day: "!h-11 !w-auto sm:!h-12", day_button: "!h-11 !rounded-xl sm:!h-12" }} />
+            </div>
           </div>
 
           <aside className="flex min-h-[390px] flex-col rounded-[20px] border border-[var(--line)] bg-[var(--navy-soft)]/55 p-4 sm:p-5" aria-live="polite">
