@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+
+  <style>
+    body {
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:#f4f6f8;
+      font-family:Arial,sans-serif;
+      color:#222;
+      padding:20px;
+      box-sizing:border-box;
+    }
+
+    .login-card {
+      width:min(430px,100%);
+      background:white;
+      border-radius:10px;
+      box-shadow:0 6px 24px rgba(0,0,0,.16);
+      overflow:hidden;
+    }
+
+    .login-header {
+      background:#123d6a;
+      color:white;
+      padding:22px;
+      text-align:center;
+      font-size:22px;
+      font-weight:bold;
+    }
+
+    .login-body {
+      padding:24px;
+    }
+
+    .subtitulo {
+      color:#666;
+      font-size:13px;
+      line-height:1.45;
+      margin-bottom:18px;
+    }
+
+    label {
+      display:block;
+      font-size:12px;
+      font-weight:bold;
+      color:#555;
+      margin:12px 0 6px;
+    }
+
+    input {
+      width:100%;
+      box-sizing:border-box;
+      padding:11px 12px;
+      border:1px solid #b7b7b7;
+      border-radius:5px;
+      font-size:15px;
+    }
+
+    .codigo {
+      letter-spacing:5px;
+      font-size:20px;
+      text-align:center;
+      font-weight:bold;
+    }
+
+    .acciones {
+      display:flex;
+      gap:9px;
+      margin-top:16px;
+    }
+
+    button {
+      border:0;
+      border-radius:5px;
+      padding:11px 14px;
+      cursor:pointer;
+      font-weight:bold;
+    }
+
+    .primario {
+      background:#1565c0;
+      color:white;
+      flex:1;
+    }
+
+    .secundario {
+      background:#e8eef3;
+      color:#123d6a;
+    }
+
+    button:disabled {
+      opacity:.55;
+      cursor:default;
+    }
+
+    #pasoCodigo {
+      display:none;
+    }
+
+    #mensaje {
+      display:none;
+      margin-top:15px;
+      padding:10px 12px;
+      border-radius:5px;
+      font-size:13px;
+      line-height:1.4;
+      white-space:pre-line;
+    }
+
+    .info {
+      display:block !important;
+      background:#eaf2f8;
+      color:#123d6a;
+    }
+
+    .ok {
+      display:block !important;
+      background:#e8f5e9;
+      color:#1b5e20;
+    }
+
+    .error {
+      display:block !important;
+      background:#ffebee;
+      color:#b71c1c;
+    }
+
+    .nota {
+      margin-top:18px;
+      color:#777;
+      font-size:11px;
+      line-height:1.4;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="login-card">
+
+    <div class="login-header">
+      SII - Portal de Compras
+    </div>
+
+    <div class="login-body">
+
+      <div class="subtitulo">
+        Ingresá tu correo corporativo habilitado.
+        Si Google no puede identificar tu cuenta automáticamente,
+        recibirás un código temporal por email.
+      </div>
+
+      <div id="pasoEmail">
+
+        <label>Correo electrónico</label>
+
+        <input
+          id="email"
+          type="email"
+          autocomplete="email"
+          placeholder="usuario@empresa.com"
+          onkeydown="if(event.key==='Enter'){solicitarCodigo();}">
+
+        <div class="acciones">
+          <button
+            id="btnEnviar"
+            class="primario"
+            onclick="solicitarCodigo()">
+            Enviar código
+          </button>
+        </div>
+
+      </div>
+
+
+      <div id="pasoCodigo">
+
+        <label>Código de 6 dígitos</label>
+
+        <input
+          id="codigo"
+          class="codigo"
+          type="text"
+          inputmode="numeric"
+          maxlength="6"
+          autocomplete="one-time-code"
+          placeholder="000000"
+          onkeydown="if(event.key==='Enter'){validarCodigo();}">
+
+        <div class="acciones">
+
+          <button
+            class="secundario"
+            onclick="volverEmail()">
+            Cambiar correo
+          </button>
+
+          <button
+            id="btnValidar"
+            class="primario"
+            onclick="validarCodigo()">
+            Ingresar
+          </button>
+
+        </div>
+
+      </div>
+
+      <div id="mensaje"></div>
+
+      <div class="nota">
+        El acceso está limitado a usuarios previamente autorizados.
+        El código es temporal y no da acceso directo a la Google Sheet.
+      </div>
+
+    </div>
+
+  </div>
+
+
+<script>
+
+  let emailActual =
+    '';
+
+
+  window.addEventListener(
+    'load',
+    function() {
+
+      /*
+       * Si ya existe una sesión temporal válida en este navegador,
+       * reingresamos automáticamente.
+       */
+      let token = '';
+
+      try {
+        token =
+          localStorage.getItem(
+            'sii_portal_token'
+          ) || '';
+      } catch (error) {}
+
+      if (!token) {
+        return;
+      }
+
+      mostrarMensaje(
+        'Verificando sesión guardada...',
+        'info'
+      );
+
+      google.script.run
+        .withSuccessHandler(
+          function(r) {
+
+            if (
+              r &&
+              r.ok
+            ) {
+              window.top.location.href =
+                r.url;
+              return;
+            }
+
+            limpiarSesionLocal();
+            ocultarMensaje();
+          }
+        )
+        .withFailureHandler(
+          function() {
+            limpiarSesionLocal();
+            ocultarMensaje();
+          }
+        )
+        .verificarSesionPortal(
+          token
+        );
+    }
+  );
+
+
+  function solicitarCodigo() {
+
+    const email =
+      document
+        .getElementById(
+          'email'
+        )
+        .value
+        .trim()
+        .toLowerCase();
+
+    if (
+      !email ||
+      !email.includes('@')
+    ) {
+      mostrarMensaje(
+        'Ingresá un correo electrónico válido.',
+        'error'
+      );
+      return;
+    }
+
+    const boton =
+      document.getElementById(
+        'btnEnviar'
+      );
+
+    boton.disabled =
+      true;
+
+    boton.textContent =
+      'Enviando...';
+
+    mostrarMensaje(
+      'Enviando código...',
+      'info'
+    );
+
+    google.script.run
+      .withSuccessHandler(
+        function(r) {
+
+          emailActual =
+            r.email;
+
+          boton.disabled =
+            false;
+
+          boton.textContent =
+            'Enviar código';
+
+          document
+            .getElementById(
+              'pasoEmail'
+            )
+            .style.display =
+              'none';
+
+          document
+            .getElementById(
+              'pasoCodigo'
+            )
+            .style.display =
+              'block';
+
+          document
+            .getElementById(
+              'codigo'
+            )
+            .focus();
+
+          mostrarMensaje(
+            'Código enviado a ' +
+            r.email +
+            '. Vence en ' +
+            r.venceMinutos +
+            ' minutos.',
+            'ok'
+          );
+        }
+      )
+      .withFailureHandler(
+        function(error) {
+
+          boton.disabled =
+            false;
+
+          boton.textContent =
+            'Enviar código';
+
+          mostrarMensaje(
+            error.message ||
+            error,
+            'error'
+          );
+        }
+      )
+      .solicitarCodigoPortal(
+        email
+      );
+  }
+
+
+  function validarCodigo() {
+
+    const codigo =
+      document
+        .getElementById(
+          'codigo'
+        )
+        .value
+        .trim();
+
+    if (
+      !emailActual
+    ) {
+      volverEmail();
+      return;
+    }
+
+    if (
+      !/^\d{6}$/.test(
+        codigo
+      )
+    ) {
+      mostrarMensaje(
+        'Ingresá el código de 6 dígitos.',
+        'error'
+      );
+      return;
+    }
+
+    const boton =
+      document.getElementById(
+        'btnValidar'
+      );
+
+    boton.disabled =
+      true;
+
+    boton.textContent =
+      'Validando...';
+
+    mostrarMensaje(
+      'Validando código...',
+      'info'
+    );
+
+    google.script.run
+      .withSuccessHandler(
+        function(r) {
+
+          try {
+            localStorage.setItem(
+              'sii_portal_token',
+              r.token
+            );
+
+            localStorage.setItem(
+              'sii_portal_email',
+              r.email
+            );
+          } catch (error) {}
+
+          window.top.location.href =
+            r.url;
+        }
+      )
+      .withFailureHandler(
+        function(error) {
+
+          boton.disabled =
+            false;
+
+          boton.textContent =
+            'Ingresar';
+
+          mostrarMensaje(
+            error.message ||
+            error,
+            'error'
+          );
+        }
+      )
+      .validarCodigoPortal(
+        emailActual,
+        codigo
+      );
+  }
+
+
+  function volverEmail() {
+
+    emailActual =
+      '';
+
+    document
+      .getElementById(
+        'codigo'
+      )
+      .value =
+        '';
+
+    document
+      .getElementById(
+        'pasoCodigo'
+      )
+      .style.display =
+        'none';
+
+    document
+      .getElementById(
+        'pasoEmail'
+      )
+      .style.display =
+        'block';
+
+    ocultarMensaje();
+
+    document
+      .getElementById(
+        'email'
+      )
+      .focus();
+  }
+
+
+  function limpiarSesionLocal() {
+    try {
+      localStorage.removeItem(
+        'sii_portal_token'
+      );
+      localStorage.removeItem(
+        'sii_portal_email'
+      );
+    } catch (error) {}
+  }
+
+
+  function mostrarMensaje(
+    texto,
+    clase
+  ) {
+
+    const mensaje =
+      document.getElementById(
+        'mensaje'
+      );
+
+    mensaje.className =
+      clase;
+
+    mensaje.textContent =
+      texto;
+  }
+
+
+  function ocultarMensaje() {
+
+    const mensaje =
+      document.getElementById(
+        'mensaje'
+      );
+
+    mensaje.className =
+      '';
+
+    mensaje.textContent =
+      '';
+  }
+
+</script>
+
+</body>
+</html>

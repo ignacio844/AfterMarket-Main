@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+
+  <script
+    src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js">
+  </script>
+
+  <style>
+    :root {
+      --azul: #17365d;
+      --azul-medio: #1f4e78;
+      --azul-claro: #d9eaf7;
+      --fondo: #f5f7fa;
+      --borde: #d7dce2;
+      --texto: #202124;
+      --secundario: #5f6368;
+      --blanco: #ffffff;
+      --rojo: #b3261e;
+      --verde: #137333;
+      --verde-claro: #e6f4ea;
+      --amarillo: #b06000;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--fondo);
+      color: var(--texto);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cabecera {
+      background: var(--azul);
+      color: var(--blanco);
+      padding: 18px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cabecera h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .contenido {
+      padding: 20px 24px 24px;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--blanco);
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+
+    .filtros {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1.1fr 1.6fr 1.4fr 1.2fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .campo {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--secundario);
+    }
+
+    input,
+    select {
+      width: 100%;
+      height: 38px;
+      border: 1px solid var(--borde);
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 14px;
+      background: var(--blanco);
+    }
+
+    button {
+      height: 38px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .primario {
+      background: var(--azul-medio);
+      color: var(--blanco);
+    }
+
+    .secundario {
+      background: var(--azul-claro);
+      color: var(--azul);
+    }
+
+    .barra {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--borde);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .estado {
+      font-size: 13px;
+      color: var(--secundario);
+    }
+
+    .tabla-contenedor {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--azul-medio);
+      color: var(--blanco);
+      text-align: left;
+      font-size: 12px;
+      padding: 10px;
+    }
+
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #eceff1;
+      font-size: 13px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    tbody tr:hover {
+      background: #f0f6fb;
+    }
+
+    .pie {
+      padding: 10px 16px;
+      border-top: 1px solid var(--borde);
+      color: var(--secundario);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .mensaje {
+      padding: 28px 18px;
+      text-align: center;
+      color: var(--secundario);
+    }
+
+    .error {
+      color: var(--rojo);
+    }
+
+    .ok {
+      color: var(--verde);
+    }
+
+    .modal-fondo {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.42);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-fondo.visible {
+      display: flex;
+    }
+
+    .modal {
+      width: min(760px, 92vw);
+      max-height: 86vh;
+      overflow: auto;
+      background: var(--blanco);
+      border-radius: 10px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.28);
+    }
+
+    .modal-titulo {
+      background: var(--azul);
+      color: var(--blanco);
+      padding: 16px 20px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .modal-contenido {
+      padding: 20px;
+    }
+
+    .selector-archivo {
+      border: 2px dashed #9bb8d1;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      background: #f8fbfd;
+    }
+
+    .resumen {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .tarjeta {
+      padding: 12px;
+      border: 1px solid var(--borde);
+      border-radius: 7px;
+      text-align: center;
+    }
+
+    .tarjeta strong {
+      display: block;
+      font-size: 20px;
+      margin-top: 4px;
+    }
+
+    .lista {
+      max-height: 190px;
+      overflow: auto;
+      margin-top: 14px;
+      border: 1px solid var(--borde);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .lista.errores {
+      color: var(--rojo);
+      background: #fff8f7;
+    }
+
+    .lista.advertencias {
+      color: var(--amarillo);
+      background: #fffaf0;
+    }
+
+    .modal-acciones {
+      padding: 14px 20px;
+      border-top: 1px solid var(--borde);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* MODAL DE ÉXITO */
+
+    #modalExito {
+      z-index: 200;
+    }
+
+    .modal-exito {
+      width: min(560px, 90vw);
+      overflow: hidden;
+    }
+
+    .exito-cuerpo {
+      padding: 26px 28px 18px;
+    }
+
+    .exito-icono {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 14px;
+      border-radius: 50%;
+      background: var(--verde-claro);
+      color: var(--verde);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      font-weight: bold;
+    }
+
+    .exito-titulo {
+      margin: 0;
+      text-align: center;
+      color: var(--verde);
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .exito-texto {
+      margin: 8px 0 22px;
+      text-align: center;
+      color: var(--secundario);
+      font-size: 14px;
+    }
+
+    .exito-datos {
+      border-top: 1px solid var(--borde);
+      border-bottom: 1px solid var(--borde);
+      padding: 12px 0;
+    }
+
+    .exito-fila {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 7px 4px;
+      font-size: 14px;
+    }
+
+    .exito-fila span:first-child {
+      color: var(--secundario);
+    }
+
+    .exito-fila strong {
+      text-align: right;
+    }
+
+    .exito-acciones {
+      padding: 0 28px 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .exito-acciones button {
+      min-width: 140px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header class="cabecera">
+      <h1>Administración de Órdenes</h1>
+      <span>Sprint A.2.3</span>
+    </header>
+
+    <main class="contenido">
+      <section class="panel filtros">
+        <div class="campo">
+          <label>Número PI / Orden</label>
+          <input id="numeroPi" placeholder="Ej. PI-2564">
+        </div>
+
+        <div class="campo">
+          <label>Proveedor</label>
+          <select id="proveedor">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label>Marca</label>
+          <select id="marca">
+            <option value="">Todas</option>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label>Estado</label>
+          <select id="estado">
+            <option value="">Todos</option>
+          </select>
+        </div>
+
+        <button
+          class="primario"
+          onclick="buscar()"
+        >
+          Buscar
+        </button>
+      </section>
+
+      <section
+        class="panel"
+        style="
+          flex:1;
+          min-height:0;
+          display:flex;
+          flex-direction:column;
+        "
+      >
+        <div class="barra">
+          <div
+            id="estadoVista"
+            class="estado"
+          >
+            Inicializando…
+          </div>
+
+          <button
+            class="secundario"
+            onclick="abrirImportacion()"
+          >
+            📂 Importar órdenes
+          </button>
+        </div>
+
+        <div
+          id="tabla"
+          class="tabla-contenedor"
+        >
+          <div class="mensaje">
+            Cargando…
+          </div>
+        </div>
+
+        <div class="pie">
+          <span id="hojaFuente"></span>
+          <span id="duracion"></span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+
+  <!-- MODAL IMPORTACIÓN -->
+  <div
+    id="modalImportacion"
+    class="modal-fondo"
+  >
+    <div class="modal">
+      <div class="modal-titulo">
+        Importar órdenes desde Excel
+      </div>
+
+      <div class="modal-contenido">
+        <div class="selector-archivo">
+          <input
+            id="archivoExcel"
+            type="file"
+            accept=".xlsx,.xls"
+          >
+
+          <p>
+            Seleccioná el archivo de órdenes.
+            Primero se validará; no se modificará ninguna hoja.
+          </p>
+
+          <button
+            id="btnAnalizar"
+            class="primario"
+            onclick="analizarArchivo()"
+          >
+            Analizar archivo
+          </button>
+        </div>
+
+        <div id="resultadoAnalisis"></div>
+      </div>
+
+      <div class="modal-acciones">
+        <button
+          class="secundario"
+          onclick="cerrarImportacion()"
+        >
+          Cancelar
+        </button>
+
+        <button
+          id="btnImportar"
+          class="primario"
+          onclick="confirmarImportacion()"
+          disabled
+        >
+          Importar
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL ÉXITO -->
+  <div
+    id="modalExito"
+    class="modal-fondo"
+  >
+    <div class="modal modal-exito">
+      <div class="modal-titulo">
+        Importación de órdenes
+      </div>
+
+      <div class="exito-cuerpo">
+        <div class="exito-icono">
+          ✓
+        </div>
+
+        <h2 class="exito-titulo">
+          IMPORTACIÓN COMPLETADA
+        </h2>
+
+        <p class="exito-texto">
+          Las órdenes se importaron correctamente.
+        </p>
+
+        <div class="exito-datos">
+          <div class="exito-fila">
+            <span>Órdenes procesadas</span>
+            <strong id="exitoOrdenes">-</strong>
+          </div>
+
+          <div class="exito-fila">
+            <span>Líneas importadas</span>
+            <strong id="exitoLineas">-</strong>
+          </div>
+
+          <div class="exito-fila">
+            <span>Estado</span>
+            <strong class="ok">Sin errores</strong>
+          </div>
+
+          <div class="exito-fila">
+            <span>Fecha</span>
+            <strong id="exitoFecha">-</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="exito-acciones">
+        <button
+          class="primario"
+          onclick="cerrarExito()"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    let payloadImportacion = null;
+
+    document.addEventListener(
+      'DOMContentLoaded',
+      inicializar
+    );
+
+    document.addEventListener(
+      'keydown',
+      function(evento) {
+        if (evento.key !== 'Escape') {
+          return;
+        }
+
+        if (
+          document
+            .getElementById('modalExito')
+            .classList
+            .contains('visible')
+        ) {
+          cerrarExito();
+          return;
+        }
+
+        if (
+          document
+            .getElementById('modalImportacion')
+            .classList
+            .contains('visible')
+        ) {
+          cerrarImportacion();
+        }
+      }
+    );
+
+
+    function inicializar() {
+      google.script.run
+        .withSuccessHandler(
+          cargarInicializacion
+        )
+        .withFailureHandler(
+          mostrarError
+        )
+        .aoObtenerInicializacion();
+    }
+
+
+    function cargarInicializacion(datos) {
+      if (!datos || !datos.ok) {
+        mostrarError(
+          datos && datos.mensaje
+            ? datos.mensaje
+            : 'No fue posible inicializar.'
+        );
+        return;
+      }
+
+      cargarOpciones(
+        'proveedor',
+        datos.proveedores
+      );
+
+      cargarOpciones(
+        'marca',
+        datos.marcas
+      );
+
+      cargarOpciones(
+        'estado',
+        datos.estados
+      );
+
+      buscar();
+    }
+
+
+    function cargarOpciones(id, valores) {
+      const select =
+        document.getElementById(id);
+
+      while (
+        select.options.length > 1
+      ) {
+        select.remove(1);
+      }
+
+      (valores || []).forEach(
+        function(valor) {
+          const opcion =
+            document.createElement(
+              'option'
+            );
+
+          opcion.value = valor;
+          opcion.textContent = valor;
+
+          select.appendChild(opcion);
+        }
+      );
+    }
+
+
+    function buscar() {
+      const filtros = {
+        numeroPi:
+          document
+            .getElementById(
+              'numeroPi'
+            ).value,
+
+        proveedor:
+          document
+            .getElementById(
+              'proveedor'
+            ).value,
+
+        marca:
+          document
+            .getElementById(
+              'marca'
+            ).value,
+
+        estado:
+          document
+            .getElementById(
+              'estado'
+            ).value
+      };
+
+      document.getElementById(
+        'estadoVista'
+      ).textContent =
+        'Buscando órdenes…';
+
+      google.script.run
+        .withSuccessHandler(
+          mostrarResultados
+        )
+        .withFailureHandler(
+          mostrarError
+        )
+        .aoBuscarOrdenes(filtros);
+    }
+
+
+    function mostrarResultados(respuesta) {
+      if (
+        !respuesta ||
+        !respuesta.ok
+      ) {
+        mostrarError(
+          respuesta &&
+          respuesta.mensaje
+            ? respuesta.mensaje
+            : 'Error en la consulta.'
+        );
+        return;
+      }
+
+      const resultados =
+        respuesta.resultados || [];
+
+      document.getElementById(
+        'estadoVista'
+      ).textContent =
+        resultados.length +
+        ' orden(es) encontradas';
+
+      document.getElementById(
+        'duracion'
+      ).textContent =
+        respuesta.duracionMs +
+        ' ms';
+
+      document.getElementById(
+        'hojaFuente'
+      ).textContent =
+        'Fuente: ' +
+        (respuesta.hoja || '');
+
+      if (!resultados.length) {
+        document.getElementById(
+          'tabla'
+        ).innerHTML =
+          '<div class="mensaje">' +
+          'No se encontraron órdenes.' +
+          '</div>';
+        return;
+      }
+
+      let html =
+        '<table>' +
+        '<thead>' +
+        '<tr>' +
+        '<th style="width:14%">PI / ORDEN</th>' +
+        '<th style="width:24%">PROVEEDOR</th>' +
+        '<th style="width:20%">MARCA</th>' +
+        '<th style="width:15%">ESTADO</th>' +
+        '<th style="width:13%">FECHA</th>' +
+        '<th style="width:14%">IMPORTE</th>' +
+        '</tr>' +
+        '</thead>' +
+        '<tbody>';
+
+      resultados.forEach(
+        function(item) {
+          html +=
+            '<tr>' +
+            '<td>' +
+              escaparHtml(item.numeroPi) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.proveedor) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.marca) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.estado) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.fecha) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.importe) +
+            '</td>' +
+            '</tr>';
+        }
+      );
+
+      html +=
+        '</tbody>' +
+        '</table>';
+
+      document.getElementById(
+        'tabla'
+      ).innerHTML = html;
+    }
+
+
+    function abrirImportacion() {
+      payloadImportacion = null;
+
+      document.getElementById(
+        'archivoExcel'
+      ).value = '';
+
+      document.getElementById(
+        'resultadoAnalisis'
+      ).innerHTML = '';
+
+      document.getElementById(
+        'btnImportar'
+      ).disabled = true;
+
+      document.getElementById(
+        'modalImportacion'
+      ).classList.add(
+        'visible'
+      );
+    }
+
+
+    function cerrarImportacion() {
+      document.getElementById(
+        'modalImportacion'
+      ).classList.remove(
+        'visible'
+      );
+    }
+
+
+    async function analizarArchivo() {
+      const input =
+        document.getElementById(
+          'archivoExcel'
+        );
+
+      const archivo =
+        input.files[0];
+
+      if (!archivo) {
+        mostrarErrorImportacion(
+          'Seleccioná un archivo Excel.'
+        );
+        return;
+      }
+
+      const btn =
+        document.getElementById(
+          'btnAnalizar'
+        );
+
+      btn.disabled = true;
+      btn.textContent =
+        'Analizando…';
+
+      try {
+        const buffer =
+          await archivo.arrayBuffer();
+
+        const workbook =
+          XLSX.read(
+            buffer,
+            {
+              type: 'array',
+              cellDates: false,
+              raw: true
+            }
+          );
+
+        const nombreHoja =
+          workbook.SheetNames[0];
+
+        const worksheet =
+          workbook.Sheets[
+            nombreHoja
+          ];
+
+        const filas =
+          XLSX.utils
+            .sheet_to_json(
+              worksheet,
+              {
+                header: 1,
+                defval: '',
+                raw: true,
+                blankrows: false
+              }
+            );
+
+        payloadImportacion = {
+          nombreArchivo:
+            archivo.name,
+          nombreHoja:
+            nombreHoja,
+          filas:
+            filas
+        };
+
+        google.script.run
+          .withSuccessHandler(
+            function(resultado) {
+              btn.disabled = false;
+              btn.textContent =
+                'Analizar archivo';
+
+              mostrarAnalisis(
+                resultado
+              );
+            }
+          )
+          .withFailureHandler(
+            function(error) {
+              btn.disabled = false;
+              btn.textContent =
+                'Analizar archivo';
+
+              mostrarErrorImportacion(
+                error
+              );
+            }
+          )
+          .ioAnalizarArchivo(
+            payloadImportacion
+          );
+
+      } catch (error) {
+        btn.disabled = false;
+        btn.textContent =
+          'Analizar archivo';
+
+        mostrarErrorImportacion(
+          error
+        );
+      }
+    }
+
+
+    function mostrarAnalisis(resultado) {
+      let html =
+        '<div class="resumen">' +
+        tarjeta(
+          'Filas',
+          resultado.filasRecibidas
+        ) +
+        tarjeta(
+          'Órdenes',
+          resultado.ordenesDetectadas
+        ) +
+        tarjeta(
+          'Detalles',
+          resultado.detallesValidos
+        ) +
+        tarjeta(
+          'Errores',
+          resultado.totalErrores,
+          resultado.totalErrores
+            ? 'error'
+            : 'ok'
+        ) +
+        '</div>';
+
+      if (resultado.totalErrores) {
+        html +=
+          '<div class="lista errores">' +
+          '<strong>Errores:</strong><br>' +
+          resultado.errores
+            .map(escaparHtml)
+            .join('<br>') +
+          '</div>';
+      }
+
+      if (
+        resultado.totalAdvertencias
+      ) {
+        html +=
+          '<div class="lista advertencias">' +
+          '<strong>Advertencias:</strong><br>' +
+          resultado.advertencias
+            .map(escaparHtml)
+            .join('<br>') +
+          '</div>';
+      }
+
+      document.getElementById(
+        'resultadoAnalisis'
+      ).innerHTML =
+        html;
+
+      document.getElementById(
+        'btnImportar'
+      ).disabled =
+        !resultado.ok;
+    }
+
+
+    function confirmarImportacion() {
+      if (!payloadImportacion) {
+        return;
+      }
+
+      const btn =
+        document.getElementById(
+          'btnImportar'
+        );
+
+      btn.disabled = true;
+      btn.textContent =
+        'Importando…';
+
+      google.script.run
+        .withSuccessHandler(
+          function(resultado) {
+            btn.disabled = false;
+            btn.textContent =
+              'Importar';
+
+            cerrarImportacion();
+
+            mostrarExito(
+              resultado
+            );
+          }
+        )
+        .withFailureHandler(
+          function(error) {
+            btn.disabled = false;
+            btn.textContent =
+              'Importar';
+
+            mostrarErrorImportacion(
+              error
+            );
+          }
+        )
+        .ioImportarArchivo(
+          payloadImportacion
+        );
+    }
+
+
+    function mostrarExito(resultado) {
+      const ordenes =
+        resultado &&
+        resultado.ordenesProcesadas !== undefined
+          ? resultado.ordenesProcesadas
+          : '-';
+
+      const lineas =
+        resultado &&
+        resultado.filasProcesadas !== undefined
+          ? resultado.filasProcesadas
+          : '-';
+
+      document.getElementById(
+        'exitoOrdenes'
+      ).textContent =
+        formatearNumero(ordenes);
+
+      document.getElementById(
+        'exitoLineas'
+      ).textContent =
+        formatearNumero(lineas);
+
+      document.getElementById(
+        'exitoFecha'
+      ).textContent =
+        formatearFechaActual();
+
+      document.getElementById(
+        'modalExito'
+      ).classList.add(
+        'visible'
+      );
+    }
+
+
+    function cerrarExito() {
+      document.getElementById(
+        'modalExito'
+      ).classList.remove(
+        'visible'
+      );
+
+      payloadImportacion = null;
+
+      // Refresca combos y tabla principal.
+      inicializar();
+    }
+
+
+    function formatearNumero(valor) {
+      const numero =
+        Number(valor);
+
+      if (!Number.isFinite(numero)) {
+        return String(valor);
+      }
+
+      return numero.toLocaleString(
+        'es-AR'
+      );
+    }
+
+
+    function formatearFechaActual() {
+      const ahora =
+        new Date();
+
+      const fecha =
+        ahora.toLocaleDateString(
+          'es-AR'
+        );
+
+      const hora =
+        ahora.toLocaleTimeString(
+          'es-AR',
+          {
+            hour: '2-digit',
+            minute: '2-digit'
+          }
+        );
+
+      return fecha + ' ' + hora;
+    }
+
+
+    function tarjeta(
+      titulo,
+      valor,
+      clase
+    ) {
+      return (
+        '<div class="tarjeta ' +
+        (clase || '') +
+        '">' +
+        escaparHtml(titulo) +
+        '<strong>' +
+        escaparHtml(valor) +
+        '</strong>' +
+        '</div>'
+      );
+    }
+
+
+    function mostrarErrorImportacion(
+      error
+    ) {
+      const mensaje =
+        error && error.message
+          ? error.message
+          : String(
+              error ||
+              'Error desconocido'
+            );
+
+      document.getElementById(
+        'resultadoAnalisis'
+      ).innerHTML =
+        '<div class="lista errores">' +
+        escaparHtml(mensaje) +
+        '</div>';
+    }
+
+
+    function mostrarError(error) {
+      const mensaje =
+        error && error.message
+          ? error.message
+          : String(
+              error ||
+              'Error desconocido'
+            );
+
+      document.getElementById(
+        'estadoVista'
+      ).textContent =
+        'Se produjo un error';
+
+      document.getElementById(
+        'tabla'
+      ).innerHTML =
+        '<div class="mensaje error">' +
+        escaparHtml(mensaje) +
+        '</div>';
+    }
+
+
+    function escaparHtml(valor) {
+      return String(
+        valor === null ||
+        valor === undefined
+          ? ''
+          : valor
+      )
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

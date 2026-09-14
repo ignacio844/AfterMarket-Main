@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <style>
+    :root {
+      --azul: #1f4e78;
+      --azul2: #2f75b5;
+      --fondo: #f4f7fb;
+      --borde: #d9e2ec;
+      --texto: #1f2937;
+      --muted: #64748b;
+      --verde: #2e7d32;
+      --amarillo: #b7791f;
+      --naranja: #c05621;
+      --rojo: #b91c1c;
+      --gris: #6b7280;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: var(--fondo);
+      color: var(--texto);
+    }
+
+    .app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: linear-gradient(135deg, #173a5e, #2f75b5);
+      color: white;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .title {
+      font-size: 21px;
+      font-weight: bold;
+      min-width: 220px;
+    }
+
+    .search {
+      flex: 1;
+      min-width: 340px;
+      position: relative;
+      display: flex;
+      gap: 8px;
+    }
+
+    .search input {
+      flex: 1;
+      border: 0;
+      border-radius: 7px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    button {
+      border: 0;
+      border-radius: 7px;
+      padding: 10px 15px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .primary {
+      color: #173a5e;
+      background: white;
+    }
+
+    .secondary {
+      color: white;
+      background: rgba(255,255,255,.16);
+      border: 1px solid rgba(255,255,255,.28);
+    }
+
+    .results {
+      position: absolute;
+      top: 46px;
+      left: 0;
+      right: 98px;
+      max-height: 290px;
+      overflow-y: auto;
+      background: white;
+      color: var(--texto);
+      border: 1px solid var(--borde);
+      border-radius: 8px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.16);
+      z-index: 20;
+      display: none;
+    }
+
+    .result {
+      padding: 10px 12px;
+      border-bottom: 1px solid #edf1f5;
+      cursor: pointer;
+    }
+
+    .result:hover {
+      background: #edf5fb;
+    }
+
+    .result strong {
+      color: var(--azul);
+    }
+
+    .result small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+    }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+    }
+
+    .empty,
+    .loading,
+    .error {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .error {
+      color: var(--rojo);
+      background: #fff5f5;
+    }
+
+    .header-card {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .sku-title {
+      font-size: 25px;
+      font-weight: bold;
+      color: var(--azul);
+    }
+
+    .description {
+      font-size: 16px;
+      margin-top: 5px;
+    }
+
+    .meta {
+      margin-top: 9px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .status {
+      min-width: 190px;
+      text-align: center;
+      border-radius: 10px;
+      padding: 13px;
+      color: white;
+      font-weight: bold;
+    }
+
+    .status .action {
+      font-size: 18px;
+      margin-top: 4px;
+    }
+
+    .nivel-VERDE { background: var(--verde); }
+    .nivel-AMARILLO { background: var(--amarillo); }
+    .nivel-NARANJA { background: var(--naranja); }
+    .nivel-ROJO { background: var(--rojo); }
+    .nivel-GRIS { background: var(--gris); }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(125px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .kpi {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      padding: 13px;
+      min-height: 92px;
+    }
+
+    .kpi .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: bold;
+      letter-spacing: .4px;
+    }
+
+    .kpi .value {
+      margin-top: 8px;
+      font-size: 24px;
+      font-weight: bold;
+      color: var(--azul);
+    }
+
+    .kpi .sub {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      padding: 15px;
+      min-width: 0;
+    }
+
+    .card.full {
+      grid-column: 1 / -1;
+    }
+
+    .card h3 {
+      margin: 0 0 13px;
+      color: var(--azul);
+      font-size: 15px;
+      border-bottom: 1px solid #edf1f5;
+      padding-bottom: 9px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .metric {
+      background: #f7f9fc;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .metric .m-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .metric .m-value {
+      margin-top: 5px;
+      font-weight: bold;
+      font-size: 17px;
+    }
+
+    .timeline {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding: 5px 2px 12px;
+    }
+
+    .event {
+      min-width: 185px;
+      border-left: 5px solid var(--azul2);
+      background: #f7f9fc;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .event.today {
+      border-color: var(--verde);
+    }
+
+    .event.break {
+      border-color: var(--rojo);
+    }
+
+    .event .e-date {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--azul);
+    }
+
+    .event .e-state {
+      margin-top: 5px;
+      font-weight: bold;
+    }
+
+    .event .e-info {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .rule {
+      border-left: 5px solid var(--amarillo);
+      background: #fafafa;
+      border-radius: 7px;
+      padding: 9px 11px;
+      margin-bottom: 7px;
+    }
+
+    .rule.CRITICA {
+      border-color: var(--rojo);
+    }
+
+    .rule.ALTA {
+      border-color: var(--naranja);
+    }
+
+    .rule.MEDIA {
+      border-color: var(--amarillo);
+    }
+
+    .rule.INFORMATIVA {
+      border-color: var(--azul2);
+    }
+
+    .rule .r-code {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: bold;
+    }
+
+    .rule .r-msg {
+      margin-top: 3px;
+      font-size: 13px;
+    }
+
+    .recommendation {
+      background: #edf7ed;
+      border-left: 5px solid var(--verde);
+      border-radius: 7px;
+      padding: 10px;
+      margin-bottom: 7px;
+      font-size: 13px;
+    }
+
+    .components {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .component {
+      background: #f7f9fc;
+      border-radius: 8px;
+      padding: 9px;
+    }
+
+    .component-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .bar {
+      height: 7px;
+      background: #dfe7ef;
+      border-radius: 8px;
+      margin-top: 7px;
+      overflow: hidden;
+    }
+
+    .bar > div {
+      height: 100%;
+      background: var(--azul2);
+    }
+
+    .component small {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .history {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 145px;
+      overflow-x: auto;
+      padding-top: 10px;
+    }
+
+    .month {
+      min-width: 42px;
+      text-align: center;
+    }
+
+    .month .column {
+      width: 24px;
+      margin: auto;
+      background: var(--azul2);
+      border-radius: 4px 4px 0 0;
+      min-height: 2px;
+    }
+
+    .month .month-label {
+      margin-top: 5px;
+      font-size: 9px;
+      color: var(--muted);
+    }
+
+    .month .month-value {
+      font-size: 9px;
+      margin-bottom: 3px;
+    }
+
+    .footer {
+      font-size: 10px;
+      color: var(--muted);
+      text-align: right;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 1000px) {
+      .kpis {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .card.full {
+        grid-column: auto;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="title">
+        Ficha SKU Ejecutiva
+      </div>
+
+      <div class="search">
+        <input
+          id="skuInput"
+          value="<?= skuInicial ?>"
+          placeholder="Ingresá SKU, descripción, marca o proveedor"
+          autocomplete="off"
+          oninput="programarBusqueda()"
+          onkeydown="if(event.key==='Enter'){cargarFicha();}"
+        >
+
+        <button
+          class="primary"
+          onclick="cargarFicha()"
+        >
+          Consultar
+        </button>
+
+        <div
+          class="results"
+          id="resultados"
+        ></div>
+      </div>
+
+      <button
+        class="secondary"
+        onclick="google.script.host.close()"
+      >
+        Cerrar
+      </button>
+    </div>
+
+    <div
+      class="content"
+      id="contenido"
+    >
+      <div class="empty">
+        Ingresá un SKU para consultar su situación integral.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let timerBusqueda = null;
+
+    document.addEventListener(
+      'DOMContentLoaded',
+      function() {
+        const sku =
+          document
+            .getElementById(
+              'skuInput'
+            )
+            .value
+            .trim();
+
+        if (sku) {
+          cargarFicha();
+        }
+      }
+    );
+
+
+    function cargarFicha(skuElegido) {
+      const input =
+        document.getElementById(
+          'skuInput'
+        );
+
+      if (skuElegido) {
+        input.value =
+          skuElegido;
+      }
+
+      const sku =
+        input.value.trim();
+
+      cerrarResultados();
+
+      if (!sku) {
+        mostrarError(
+          'Ingresá un SKU.'
+        );
+        return;
+      }
+
+      document.getElementById(
+        'contenido'
+      ).innerHTML =
+        '<div class="loading">Cargando modelo completo del SKU...</div>';
+
+      google.script.run
+        .withSuccessHandler(
+          renderFicha
+        )
+        .withFailureHandler(
+          function(error) {
+            mostrarError(
+              error &&
+              error.message
+                ? error.message
+                : String(error)
+            );
+          }
+        )
+        .obtenerFichaSkuEjecutiva(
+          sku
+        );
+    }
+
+
+    function programarBusqueda() {
+      clearTimeout(
+        timerBusqueda
+      );
+
+      timerBusqueda =
+        setTimeout(
+          buscar,
+          350
+        );
+    }
+
+
+    function buscar() {
+      const texto =
+        document
+          .getElementById(
+            'skuInput'
+          )
+          .value
+          .trim();
+
+      if (texto.length < 2) {
+        cerrarResultados();
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(
+          mostrarResultados
+        )
+        .withFailureHandler(
+          cerrarResultados
+        )
+        .buscarSkuFichaEjecutiva(
+          texto,
+          30
+        );
+    }
+
+
+    function mostrarResultados(lista) {
+      const contenedor =
+        document.getElementById(
+          'resultados'
+        );
+
+      if (!lista || !lista.length) {
+        cerrarResultados();
+        return;
+      }
+
+      contenedor.innerHTML =
+        lista.map(reg => `
+          <div
+            class="result"
+            onclick='cargarFicha(${JSON.stringify(reg.sku)})'
+          >
+            <strong>${escapeHtml(reg.sku)}</strong>
+            <small>
+              ${escapeHtml(reg.descripcion || '')}
+              ${reg.marca ? ' · ' + escapeHtml(reg.marca) : ''}
+              ${reg.proveedor ? ' · ' + escapeHtml(reg.proveedor) : ''}
+            </small>
+          </div>
+        `).join('');
+
+      contenedor.style.display =
+        'block';
+    }
+
+
+    function cerrarResultados() {
+      document.getElementById(
+        'resultados'
+      ).style.display =
+        'none';
+    }
+
+
+    function renderFicha(d) {
+      const nivel =
+        d.resumen.nivel ||
+        'GRIS';
+
+      const accion =
+        d.resumen.accion ||
+        'REVISAR';
+
+      const componentes =
+        Object.entries(
+          d.score.componentes || {}
+        );
+
+      document.getElementById(
+        'contenido'
+      ).innerHTML = `
+        <div class="header-card">
+          <div>
+            <div class="sku-title">
+              ${escapeHtml(d.identificacion.sku)}
+            </div>
+
+            <div class="description">
+              ${escapeHtml(d.identificacion.descripcion)}
+            </div>
+
+            <div class="meta">
+              <strong>Marca:</strong>
+              ${escapeHtml(d.identificacion.marca)}
+              &nbsp; | &nbsp;
+              <strong>Proveedor:</strong>
+              ${escapeHtml(d.identificacion.proveedor)}
+              <br>
+              <strong>Código proveedor:</strong>
+              ${escapeHtml(d.identificacion.codigoProveedor || '—')}
+            </div>
+          </div>
+
+          <div class="status nivel-${escapeHtml(nivel)}">
+            <div>${escapeHtml(nivel)}</div>
+            <div class="action">
+              ${escapeHtml(accion)}
+            </div>
+          </div>
+        </div>
+
+        <div class="kpis">
+          ${kpi('Score prioridad', entero(d.resumen.prioridad), '/ 100')}
+          ${kpi('Calidad de datos', entero(d.resumen.calidad), '/ 100')}
+          ${kpi('Confianza', entero(d.resumen.confianza), '%')}
+          ${kpi('Stock total', numero(d.resumen.stockTotal, 0), 'unidades')}
+          ${kpi('Pendiente total', numero(d.resumen.pendienteTotal, 0), 'unidades')}
+          ${kpi(
+            'Cobertura actual',
+            d.resumen.coberturaActual === null
+              ? '—'
+              : numero(d.resumen.coberturaActual, 2),
+            d.resumen.coberturaActual === null
+              ? 'sin cálculo'
+              : 'meses'
+          )}
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Demanda</h3>
+
+            <div class="metrics">
+              ${metric('Promedio 3M', numero(d.demanda.promedio3, 2))}
+              ${metric('Promedio 6M', numero(d.demanda.promedio6, 2))}
+              ${metric('Promedio 12M', numero(d.demanda.promedio12, 2))}
+              ${metric('Último mes', numero(d.demanda.ultimoMes, 0))}
+              ${metric('Tendencia', d.demanda.tendencia)}
+              ${metric('Aceleración', d.demanda.aceleracion)}
+              ${metric('Variabilidad', d.demanda.variabilidad)}
+              ${metric('Meses con venta', entero(d.demanda.mesesConVenta))}
+            </div>
+
+            ${renderHistorico(d.demanda.historicoMensual)}
+          </div>
+
+          <div class="card">
+            <h3>Stock e importaciones</h3>
+
+            <div class="metrics">
+              ${metric('Escobar', numero(d.stock.escobar, 0))}
+              ${metric('Warnes', numero(d.stock.warnes, 0))}
+              ${metric('Otros', numero(d.stock.otros, 0))}
+              ${metric('Disponible', numero(d.stock.disponible, 0))}
+              ${metric('En fábrica', numero(d.importaciones.enFabrica, 0))}
+              ${metric('A embarcar', numero(d.importaciones.aEmbarcar, 0))}
+              ${metric('Embarcado', numero(d.importaciones.embarcado, 0))}
+              ${metric('A ingresar', numero(d.importaciones.aIngresar, 0))}
+            </div>
+          </div>
+
+          <div class="card full">
+            <h3>Timeline de abastecimiento</h3>
+            ${renderTimeline(d.timeline.eventos)}
+          </div>
+
+          <div class="card">
+            <h3>Reglas activas</h3>
+            ${renderReglas(d.reglas.activas)}
+          </div>
+
+          <div class="card">
+            <h3>Recomendaciones</h3>
+            ${renderRecomendaciones(d.reglas.recomendaciones)}
+
+            <h3 style="margin-top:16px">
+              Compra sugerida
+            </h3>
+
+            <div class="metrics">
+              ${metric('Cantidad', numero(d.resumen.cantidadSugerida, 0))}
+              ${metric(
+                'Valor estimado',
+                d.resumen.compraEstimadaUsd === null
+                  ? '—'
+                  : 'USD ' + numero(d.resumen.compraEstimadaUsd, 2)
+              )}
+              ${metric('Primera llegada', d.importaciones.primeraLlegada || '—')}
+              ${metric('Fecha quiebre', d.timeline.fechaQuiebre || '—')}
+            </div>
+          </div>
+
+          <div class="card full">
+            <h3>Composición del Score</h3>
+            <div class="components">
+              ${componentes.map(
+                ([clave, c]) =>
+                  componente(
+                    tituloComponente(clave),
+                    c
+                  )
+              ).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          Ficha V${escapeHtml(d.meta.version)}
+          · Modelo V${escapeHtml(d.meta.versionModelo)}
+          · Generado ${escapeHtml(d.meta.generadoEn)}
+        </div>
+      `;
+    }
+
+
+    function kpi(label, value, sub) {
+      return `
+        <div class="kpi">
+          <div class="label">${escapeHtml(label)}</div>
+          <div class="value">${escapeHtml(String(value))}</div>
+          <div class="sub">${escapeHtml(sub || '')}</div>
+        </div>
+      `;
+    }
+
+
+    function metric(label, value) {
+      return `
+        <div class="metric">
+          <div class="m-label">${escapeHtml(label)}</div>
+          <div class="m-value">${escapeHtml(String(value))}</div>
+        </div>
+      `;
+    }
+
+
+    function renderTimeline(eventos) {
+      if (!eventos || !eventos.length) {
+        return '<div class="empty">Sin eventos.</div>';
+      }
+
+      return `
+        <div class="timeline">
+          ${eventos.map(e => {
+            const clase =
+              e.tipo === 'HOY'
+                ? 'today'
+                : (
+                    e.tipo === 'QUIEBRE'
+                      ? 'break'
+                      : ''
+                  );
+
+            return `
+              <div class="event ${clase}">
+                <div class="e-date">
+                  ${escapeHtml(e.fecha || 'Sin fecha')}
+                </div>
+
+                <div class="e-state">
+                  ${escapeHtml(e.estado || e.tipo)}
+                </div>
+
+                <div class="e-info">
+                  Cantidad:
+                  <strong>${numero(e.cantidad, 0)}</strong>
+                  <br>
+                  ${escapeHtml(e.descripcion || '')}
+                  ${e.idOrden ? '<br>PI: ' + escapeHtml(e.idOrden) : ''}
+                  ${e.diasDesdeHoy !== null && e.diasDesdeHoy !== undefined
+                    ? '<br>' + escapeHtml(String(e.diasDesdeHoy)) + ' días desde hoy'
+                    : ''
+                  }
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+
+    function renderReglas(reglas) {
+      if (!reglas || !reglas.length) {
+        return `
+          <div class="recommendation">
+            No hay reglas activas relevantes.
+          </div>
+        `;
+      }
+
+      return reglas.map(r => `
+        <div class="rule ${escapeHtml(r.severidad)}">
+          <div class="r-code">
+            ${escapeHtml(r.severidad)}
+            ·
+            ${escapeHtml(r.codigo)}
+          </div>
+          <div class="r-msg">
+            ${escapeHtml(r.mensaje)}
+          </div>
+        </div>
+      `).join('');
+    }
+
+
+    function renderRecomendaciones(lista) {
+      if (!lista || !lista.length) {
+        return `
+          <div class="recommendation">
+            Mantener seguimiento periódico.
+          </div>
+        `;
+      }
+
+      return lista.map(texto => `
+        <div class="recommendation">
+          ${escapeHtml(texto)}
+        </div>
+      `).join('');
+    }
+
+
+    function componente(nombre, c) {
+      const porcentaje =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Number(c.porcentaje || 0)
+          )
+        );
+
+      return `
+        <div class="component">
+          <div class="component-top">
+            <span>${escapeHtml(nombre)}</span>
+            <span>
+              ${numero(c.puntos, 2)}
+              /
+              ${numero(c.maximo, 0)}
+            </span>
+          </div>
+
+          <div class="bar">
+            <div style="width:${porcentaje}%"></div>
+          </div>
+
+          <small>
+            ${escapeHtml(c.motivo || '')}
+          </small>
+        </div>
+      `;
+    }
+
+
+    function renderHistorico(lista) {
+      if (!lista || !lista.length) {
+        return '';
+      }
+
+      const maximo =
+        Math.max(
+          1,
+          ...lista.map(
+            x => Number(x.unidades || 0)
+          )
+        );
+
+      return `
+        <div class="history">
+          ${lista.map(m => {
+            const alto =
+              Math.max(
+                2,
+                Math.round(
+                  Number(m.unidades || 0) /
+                  maximo *
+                  105
+                )
+              );
+
+            return `
+              <div class="month">
+                <div class="month-value">
+                  ${numero(m.unidades, 0)}
+                </div>
+                <div
+                  class="column"
+                  style="height:${alto}px"
+                  title="${escapeHtml(m.periodo)}"
+                ></div>
+                <div class="month-label">
+                  ${escapeHtml(m.mesNombre)}-${String(m.anio).slice(-2)}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+
+    function tituloComponente(clave) {
+      const titulos = {
+        cobertura: 'Cobertura',
+        quiebre: 'Quiebre',
+        importaciones: 'Importaciones',
+        leadTime: 'Lead Time',
+        demanda: 'Demanda',
+        stock: 'Stock',
+        ordenes: 'Órdenes'
+      };
+
+      return titulos[clave] || clave;
+    }
+
+
+    function numero(valor, decimales) {
+      const n =
+        Number(valor || 0);
+
+      return n.toLocaleString(
+        'es-AR',
+        {
+          minimumFractionDigits:
+            decimales,
+          maximumFractionDigits:
+            decimales
+        }
+      );
+    }
+
+
+    function entero(valor) {
+      return Math.round(
+        Number(valor || 0)
+      );
+    }
+
+
+    function mostrarError(texto) {
+      document.getElementById(
+        'contenido'
+      ).innerHTML =
+        '<div class="error">' +
+        escapeHtml(texto) +
+        '</div>';
+    }
+
+
+    function escapeHtml(valor) {
+      return String(
+        valor === null ||
+        valor === undefined
+          ? ''
+          : valor
+      )
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

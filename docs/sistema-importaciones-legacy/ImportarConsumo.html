@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <script
+    src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js">
+  </script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      color: #222;
+    }
+
+    h2 {
+      margin-top: 0;
+      color: #1f4e78;
+    }
+
+    input {
+      width: 100%;
+      margin: 15px 0;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    #btnImportar {
+      background: #1f4e78;
+      color: white;
+    }
+
+    #btnCerrar {
+      margin-left: 8px;
+      background: #dddddd;
+    }
+
+    #mensaje {
+      margin-top: 18px;
+      padding: 10px;
+      display: none;
+      white-space: pre-line;
+    }
+
+    .procesando {
+      display: block !important;
+      background: #fff2cc;
+      color: #7f6000;
+    }
+
+    .correcto {
+      display: block !important;
+      background: #d9ead3;
+      color: #274e13;
+    }
+
+    .error {
+      display: block !important;
+      background: #f4cccc;
+      color: #9c0006;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>Importar consumo</h2>
+
+  <div>
+    Seleccioná el archivo de consumo generado por el sistema de facturación.
+  </div>
+
+  <input
+    type="file"
+    id="archivo"
+    accept=".xlsx,.xls"
+  >
+
+  <button
+    id="btnImportar"
+    onclick="leerArchivo()"
+  >
+    Importar
+  </button>
+
+  <button
+    id="btnCerrar"
+    onclick="google.script.host.close()"
+  >
+    Cerrar
+  </button>
+
+  <div id="mensaje"></div>
+
+  <script>
+    function leerArchivo() {
+      const input = document.getElementById('archivo');
+      const mensaje = document.getElementById('mensaje');
+      const boton = document.getElementById('btnImportar');
+
+      if (!input.files.length) {
+        mostrarError('Seleccioná un archivo Excel.');
+        return;
+      }
+
+      const archivo = input.files[0];
+
+      boton.disabled = true;
+
+      mensaje.className = 'procesando';
+      mensaje.textContent =
+        'Leyendo y procesando el archivo...';
+
+      const lector = new FileReader();
+
+      lector.onload = function(evento) {
+        try {
+          const datos = new Uint8Array(
+            evento.target.result
+          );
+
+          const libro = XLSX.read(datos, {
+            type: 'array',
+            cellDates: true
+          });
+
+          /*
+           * El archivo actual trae el resumen en Hoja2.
+           * Si no existe exactamente Hoja2, utiliza la segunda hoja.
+           */
+          let nombreHoja = libro.SheetNames.find(
+            nombre =>
+              normalizarNombreHoja(nombre) === 'HOJA2'
+          );
+
+          if (!nombreHoja && libro.SheetNames.length >= 2) {
+            nombreHoja = libro.SheetNames[1];
+          }
+
+          if (!nombreHoja) {
+            throw new Error(
+              'No se encontró la hoja resumen Hoja2.'
+            );
+          }
+
+          const hoja = libro.Sheets[nombreHoja];
+
+          const filas = XLSX.utils.sheet_to_json(
+            hoja,
+            {
+              header: 1,
+              defval: '',
+              raw: false
+            }
+          );
+
+          if (!filas.length) {
+            throw new Error(
+              'La hoja resumen no contiene datos.'
+            );
+          }
+
+          /*
+           * Formato fijo de Hoja2:
+           *
+           * Columna A = SKU
+           * Columna B = Consumo total
+           * Columna C = Meses
+           *
+           * La primera fila puede contener encabezados parciales:
+           * A vacío, B "Total", C "MESES".
+           * Por eso se filtran solamente filas con SKU válido.
+           */
+          const registros = filas
+            .filter(fila => {
+              const sku = String(fila[0] || '').trim();
+
+              if (!sku) {
+                return false;
+              }
+
+              /*
+               * Evita importar una eventual fila de encabezado.
+               */
+              const skuNormalizado = sku.toUpperCase();
+
+              return ![
+                'SKU',
+                'CODIGO',
+                'CODIGO UNICO'
+              ].includes(skuNormalizado);
+            })
+            .map(fila => {
+              return [
+                String(fila[0] || '').trim(),
+                fila[1],
+                fila[2]
+              ];
+            });
+
+          if (!registros.length) {
+            throw new Error(
+              'No se encontraron SKU para importar.'
+            );
+          }
+
+          mensaje.textContent =
+            'Guardando ' +
+            registros.length +
+            ' registros en VENTAS...';
+
+          google.script.run
+            .withSuccessHandler(importacionCorrecta)
+            .withFailureHandler(importacionFallida)
+            .guardarConsumoFacturador(
+              registros,
+              archivo.name
+            );
+
+        } catch (error) {
+          importacionFallida(error);
+        }
+      };
+
+      lector.onerror = function() {
+        importacionFallida(
+          new Error('No se pudo leer el archivo.')
+        );
+      };
+
+      lector.readAsArrayBuffer(archivo);
+    }
+
+
+    function normalizarNombreHoja(valor) {
+      return String(valor || '')
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/\s+/g, '');
+    }
+
+
+    function importacionCorrecta(resultado) {
+      const mensaje = document.getElementById('mensaje');
+
+      mensaje.className = 'correcto';
+
+      mensaje.textContent =
+        'Consumo importado correctamente.\n\n' +
+        'Registros: ' + resultado.registros +
+        '\nArchivo: ' + resultado.archivo +
+        '\nFecha: ' + resultado.fecha;
+
+      document.getElementById(
+        'btnImportar'
+      ).disabled = false;
+    }
+
+
+    function importacionFallida(error) {
+      mostrarError(
+        error && error.message
+          ? error.message
+          : String(error)
+      );
+
+      document.getElementById(
+        'btnImportar'
+      ).disabled = false;
+    }
+
+
+    function mostrarError(texto) {
+      const mensaje = document.getElementById('mensaje');
+
+      mensaje.className = 'error';
+
+      mensaje.textContent =
+        'No se pudo importar el consumo.\n\n' +
+        texto;
+    }
+  </script>
+
+</body>
+</html>

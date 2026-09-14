@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <style>
+    :root {
+      --azul: #1f4e78;
+      --azul2: #2f75b5;
+      --fondo: #f4f7fb;
+      --borde: #d9e2ec;
+      --texto: #1f2937;
+      --muted: #64748b;
+      --verde: #2e7d32;
+      --amarillo: #b7791f;
+      --naranja: #c05621;
+      --rojo: #b91c1c;
+      --gris: #6b7280;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--fondo);
+      color: var(--texto);
+    }
+
+    .app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: linear-gradient(135deg, #173a5e, #2f75b5);
+      color: white;
+      padding: 13px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .title {
+      font-size: 21px;
+      font-weight: bold;
+      min-width: 285px;
+    }
+
+    .topbar .spacer {
+      flex: 1;
+    }
+
+    button {
+      border: 0;
+      border-radius: 7px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .primary {
+      background: white;
+      color: var(--azul);
+    }
+
+    .secondary {
+      background: rgba(255,255,255,.16);
+      color: white;
+      border: 1px solid rgba(255,255,255,.3);
+    }
+
+    .filters {
+      background: white;
+      border-bottom: 1px solid var(--borde);
+      padding: 10px 14px;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1.3fr 1fr 110px auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--borde);
+      border-radius: 7px;
+      padding: 9px 10px;
+      background: white;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .check input {
+      width: auto;
+    }
+
+    .content {
+      flex: 1;
+      min-height: 0;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 9px;
+      padding: 11px;
+      min-height: 78px;
+    }
+
+    .card .label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .card .value {
+      margin-top: 7px;
+      font-size: 23px;
+      font-weight: bold;
+      color: var(--azul);
+    }
+
+    .card.ROJO {
+      border-top: 5px solid var(--rojo);
+    }
+
+    .card.NARANJA {
+      border-top: 5px solid var(--naranja);
+    }
+
+    .card.AMARILLO {
+      border-top: 5px solid var(--amarillo);
+    }
+
+    .card.VERDE {
+      border-top: 5px solid var(--verde);
+    }
+
+    .card.GRIS {
+      border-top: 5px solid var(--gris);
+    }
+
+    .table-wrap {
+      flex: 1;
+      min-height: 0;
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      min-width: 1450px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: var(--azul);
+      color: white;
+      padding: 10px 8px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    td {
+      border-bottom: 1px solid #edf1f5;
+      padding: 8px;
+      vertical-align: middle;
+    }
+
+    tbody tr:hover {
+      background: #edf5fb;
+    }
+
+    .sku {
+      color: var(--azul);
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .sku:hover {
+      text-decoration: underline;
+    }
+
+    .action {
+      display: inline-block;
+      color: white;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 10px;
+      text-align: center;
+      min-width: 92px;
+    }
+
+    .action.ROJO {
+      background: var(--rojo);
+    }
+
+    .action.NARANJA {
+      background: var(--naranja);
+    }
+
+    .action.AMARILLO {
+      background: var(--amarillo);
+    }
+
+    .action.VERDE {
+      background: var(--verde);
+    }
+
+    .action.GRIS {
+      background: var(--gris);
+    }
+
+    .score {
+      font-size: 17px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .loading,
+    .empty,
+    .error {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      padding: 30px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .error {
+      color: var(--rojo);
+      background: #fff5f5;
+    }
+
+    .footer {
+      font-size: 10px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    @media (max-width: 1100px) {
+      .cards {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .filters {
+        grid-template-columns: 2fr 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="title">
+        Centro Inteligente de Compras
+      </div>
+
+      <div class="spacer"></div>
+
+      <button
+        class="primary"
+        onclick="cargarDatos()"
+      >
+        Actualizar
+      </button>
+
+      <button
+        class="secondary"
+        onclick="google.script.host.close()"
+      >
+        Cerrar
+      </button>
+    </div>
+
+    <div class="filters">
+      <input
+        id="texto"
+        placeholder="Buscar SKU, descripción, marca, proveedor..."
+        onkeydown="if(event.key==='Enter'){cargarDatos();}"
+      >
+
+      <select id="marca">
+        <option value="">Todas las marcas</option>
+      </select>
+
+      <select id="proveedor">
+        <option value="">Todos los proveedores</option>
+      </select>
+
+      <select id="accion">
+        <option value="">Todas las acciones</option>
+        <option value="COMPRAR">Comprar</option>
+        <option value="PLANIFICAR">Planificar</option>
+        <option value="REVISAR">Revisar</option>
+        <option value="REVISAR DATOS">Revisar datos</option>
+        <option value="SIN ACCIÓN">Sin acción</option>
+      </select>
+
+      <input
+        id="scoreMinimo"
+        type="number"
+        min="0"
+        max="100"
+        value="0"
+        title="Score mínimo"
+      >
+
+      <label class="check">
+        <input
+          id="soloCompra"
+          type="checkbox"
+        >
+        Solo con compra
+      </label>
+
+      <button
+        onclick="cargarDatos()"
+        style="background:#1f4e78;color:white"
+      >
+        Aplicar
+      </button>
+    </div>
+
+    <div
+      class="content"
+      id="contenido"
+    >
+      <div class="loading">
+        Cargando Centro de Compras...
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let opcionesCargadas = false;
+
+    document.addEventListener(
+      'DOMContentLoaded',
+      function() {
+        cargarOpcionesIniciales();
+        cargarDatos();
+      }
+    );
+
+
+    function cargarOpcionesIniciales() {
+      google.script.run
+        .withSuccessHandler(
+          function(opciones) {
+            reemplazarOpciones(
+              'marca',
+              opciones &&
+              opciones.marcas
+                ? opciones.marcas
+                : []
+            );
+
+            reemplazarOpciones(
+              'proveedor',
+              opciones &&
+              opciones.proveedores
+                ? opciones.proveedores
+                : []
+            );
+
+            opcionesCargadas = true;
+          }
+        )
+        .withFailureHandler(
+          function(error) {
+            console.error(
+              'No se pudieron cargar los desplegables:',
+              error
+            );
+          }
+        )
+        .obtenerOpcionesCentroComprasInteligente();
+    }
+
+
+
+    function cargarDatos() {
+      const contenido =
+        document.getElementById(
+          'contenido'
+        );
+
+      contenido.innerHTML =
+        '<div class="loading">Procesando PLAN_COMPRAS...</div>';
+
+      google.script.run
+        .withSuccessHandler(
+          renderCentro
+        )
+        .withFailureHandler(
+          function(error) {
+            contenido.innerHTML =
+              '<div class="error">' +
+              escapeHtml(
+                error &&
+                error.message
+                  ? error.message
+                  : String(error)
+              ) +
+              '</div>';
+          }
+        )
+        .obtenerCentroComprasInteligente({
+          texto:
+            value('texto'),
+
+          marca:
+            value('marca'),
+
+          proveedor:
+            value('proveedor'),
+
+          accion:
+            value('accion'),
+
+          scoreMinimo:
+            value('scoreMinimo'),
+
+          soloConCompra:
+            document
+              .getElementById(
+                'soloCompra'
+              )
+              .checked,
+
+          limite: 1000
+        });
+    }
+
+
+    function renderCentro(data) {
+      if (!opcionesCargadas) {
+        cargarOpciones(
+          'marca',
+          data.opciones.marcas
+        );
+
+        cargarOpciones(
+          'proveedor',
+          data.opciones.proveedores
+        );
+
+        opcionesCargadas = true;
+      }
+
+      const r =
+        data.resumen;
+
+      document.getElementById(
+        'contenido'
+      ).innerHTML = `
+        <div class="cards">
+          ${card('Comprar', r.comprar, 'ROJO')}
+          ${card('Planificar', r.planificar, 'NARANJA')}
+          ${card('Revisar', r.revisar, 'AMARILLO')}
+          ${card('Revisar datos', r.revisarDatos, 'GRIS')}
+          ${card('Sin acción', r.sinAccion, 'VERDE')}
+          ${card('Cantidad sugerida', numero(r.cantidadSugerida, 0), '')}
+          ${card('Compra estimada', 'USD ' + numero(r.compraEstimadaUsd, 2), '')}
+        </div>
+
+        ${
+          data.filas.length
+            ? renderTabla(data.filas)
+            : '<div class="empty">No hay SKU que cumplan los filtros.</div>'
+        }
+
+        <div class="footer">
+          ${numero(data.totalFiltrado, 0)} SKU encontrados
+          ${data.truncado ? ' · resultado limitado' : ''}
+          · Actualizado ${escapeHtml(data.generadoEn)}
+          · V${escapeHtml(data.version)}
+        </div>
+      `;
+    }
+
+
+    function renderTabla(filas) {
+      return `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Acción</th>
+                <th>Score</th>
+                <th>SKU</th>
+                <th>Descripción</th>
+                <th>Marca</th>
+                <th>Proveedor</th>
+                <th>Stock</th>
+                <th>Pendiente</th>
+                <th>Consumo mensual</th>
+                <th>Cobertura actual</th>
+                <th>Cobertura proyectada</th>
+                <th>Cant. sugerida</th>
+                <th>Compra USD</th>
+                <th>Lead Time</th>
+                <th>Días quiebre</th>
+                <th>Motivo</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              ${filas.map(f => `
+                <tr>
+                  <td>
+                    <span class="action ${escapeHtml(f.nivel)}">
+                      ${escapeHtml(f.accion)}
+                    </span>
+                  </td>
+
+                  <td class="score">
+                    ${numero(f.score, 0)}
+                  </td>
+
+                  <td
+                    class="sku"
+                    onclick='abrirFicha(${JSON.stringify(f.sku)})'
+                    title="Abrir Ficha SKU"
+                  >
+                    ${escapeHtml(f.sku)}
+                  </td>
+
+                  <td>
+                    ${escapeHtml(f.descripcion || '')}
+                  </td>
+
+                  <td>
+                    ${escapeHtml(f.marca || '')}
+                  </td>
+
+                  <td>
+                    ${escapeHtml(f.proveedor || '')}
+                  </td>
+
+                  <td class="num">
+                    ${numero(f.stockTotal, 2)}
+                  </td>
+
+                  <td class="num">
+                    ${numero(f.pendienteRecibir, 2)}
+                  </td>
+
+                  <td class="num">
+                    ${numero(f.consumoMensual, 2)}
+                  </td>
+
+                  <td class="num">
+                    ${
+                      f.coberturaActual === null
+                        ? '—'
+                        : numero(f.coberturaActual, 2)
+                    }
+                  </td>
+
+                  <td class="num">
+                    ${
+                      f.coberturaProyectada === null
+                        ? '—'
+                        : numero(f.coberturaProyectada, 2)
+                    }
+                  </td>
+
+                  <td class="num">
+                    ${numero(f.cantidadSugerida, 0)}
+                  </td>
+
+                  <td class="num">
+                    ${
+                      f.compraEstimadaUsd === null
+                        ? '—'
+                        : numero(f.compraEstimadaUsd, 2)
+                    }
+                  </td>
+
+                  <td class="num">
+                    ${
+                      f.leadTimeDias === null
+                        ? '—'
+                        : numero(f.leadTimeDias, 0)
+                    }
+                  </td>
+
+                  <td class="num">
+                    ${
+                      f.diasQuiebre === null
+                        ? '—'
+                        : numero(f.diasQuiebre, 0)
+                    }
+                  </td>
+
+                  <td class="muted">
+                    ${escapeHtml(f.motivo || '')}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+
+    function abrirFicha(sku) {
+      google.script.run
+        .withFailureHandler(
+          function(error) {
+            alert(
+              error &&
+              error.message
+                ? error.message
+                : String(error)
+            );
+          }
+        )
+        .abrirFichaDesdeCentroCompras(
+          sku
+        );
+    }
+
+
+    function cargarOpciones(
+      id,
+      lista
+    ) {
+      reemplazarOpciones(
+        id,
+        lista
+      );
+    }
+
+
+    function reemplazarOpciones(
+      id,
+      lista
+    ) {
+      const select =
+        document.getElementById(id);
+
+      const actual =
+        select.value;
+
+      const etiquetaBase =
+        id === 'marca'
+          ? 'Todas las marcas'
+          : 'Todos los proveedores';
+
+      select.innerHTML = '';
+
+      const opcionBase =
+        document.createElement(
+          'option'
+        );
+
+      opcionBase.value = '';
+      opcionBase.textContent =
+        etiquetaBase;
+
+      select.appendChild(
+        opcionBase
+      );
+
+      (
+        Array.isArray(lista)
+          ? lista
+          : []
+      ).forEach(texto => {
+        const valor =
+          String(texto || '')
+            .trim();
+
+        if (!valor) {
+          return;
+        }
+
+        const option =
+          document.createElement(
+            'option'
+          );
+
+        option.value =
+          valor;
+
+        option.textContent =
+          valor;
+
+        select.appendChild(
+          option
+        );
+      });
+
+      if (
+        Array.from(
+          select.options
+        ).some(
+          option =>
+            option.value ===
+            actual
+        )
+      ) {
+        select.value =
+          actual;
+      }
+    }
+
+
+    function card(
+      label,
+      value,
+      clase
+    ) {
+      return `
+        <div class="card ${clase || ''}">
+          <div class="label">
+            ${escapeHtml(label)}
+          </div>
+          <div class="value">
+            ${escapeHtml(String(value))}
+          </div>
+        </div>
+      `;
+    }
+
+
+    function value(id) {
+      return document
+        .getElementById(id)
+        .value;
+    }
+
+
+    function numero(
+      valor,
+      decimales
+    ) {
+      return Number(valor || 0)
+        .toLocaleString(
+          'es-AR',
+          {
+            minimumFractionDigits:
+              decimales,
+            maximumFractionDigits:
+              decimales
+          }
+        );
+    }
+
+
+    function escapeHtml(valor) {
+      return String(
+        valor === null ||
+        valor === undefined
+          ? ''
+          : valor
+      )
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

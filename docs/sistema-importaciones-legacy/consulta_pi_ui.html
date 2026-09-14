@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f3f6f9;
+      color: #1f2933;
+    }
+
+    h1 {
+      margin: 0 0 20px 0;
+      color: #1f4e78;
+      font-size: 26px;
+    }
+
+    .panel {
+      background: white;
+      border: 1px solid #d8e1e8;
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    .selector {
+      display: grid;
+      grid-template-columns: 1fr 160px;
+      gap: 12px;
+      align-items: end;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    select,
+    button {
+      width: 100%;
+      height: 40px;
+      border-radius: 5px;
+      border: 1px solid #b9c7d4;
+      font-size: 14px;
+    }
+
+    select {
+      padding: 0 10px;
+      background: white;
+    }
+
+    button {
+      cursor: pointer;
+      background: #1f4e78;
+      color: white;
+      font-weight: bold;
+    }
+
+    button:disabled {
+      background: #aab6c1;
+      cursor: default;
+    }
+
+    .cabecera {
+      display: grid;
+      grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .campo {
+      background: #f7f9fb;
+      border: 1px solid #dce4ea;
+      border-radius: 6px;
+      padding: 11px;
+      min-height: 52px;
+    }
+
+    .campo-titulo {
+      font-size: 12px;
+      color: #66788a;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+
+    .campo-valor {
+      font-size: 15px;
+      font-weight: bold;
+      overflow-wrap: anywhere;
+    }
+
+    .resumen {
+      display: grid;
+      grid-template-columns:
+        repeat(5, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .tarjeta {
+      border-radius: 7px;
+      padding: 14px;
+      text-align: center;
+      background: #1f4e78;
+      color: white;
+    }
+
+    .tarjeta-numero {
+      font-size: 25px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .tarjeta-texto {
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .barra-contenedor {
+      width: 100%;
+      height: 22px;
+      background: #e4e9ed;
+      border-radius: 11px;
+      overflow: hidden;
+      margin-top: 12px;
+    }
+
+    .barra {
+      height: 100%;
+      width: 0;
+      background: #38761d;
+      transition: width 0.3s;
+    }
+
+    .avance-texto {
+      text-align: right;
+      margin-top: 5px;
+      font-weight: bold;
+      color: #38761d;
+    }
+
+    .tabla-contenedor {
+      max-height: 390px;
+      overflow: auto;
+      border: 1px solid #d8e1e8;
+      border-radius: 6px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background: white;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #1f4e78;
+      color: white;
+      padding: 10px;
+      text-align: left;
+      font-size: 12px;
+      z-index: 1;
+    }
+
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #e2e8ed;
+      font-size: 13px;
+    }
+
+    td.numero,
+    th.numero {
+      text-align: right;
+    }
+
+    tr:nth-child(even) td {
+      background: #f8fafb;
+    }
+
+    .estado {
+      display: inline-block;
+      min-width: 90px;
+      padding: 5px 8px;
+      border-radius: 12px;
+      text-align: center;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .estado-recibido {
+      background: #d9ead3;
+      color: #274e13;
+    }
+
+    .estado-parcial {
+      background: #fff2cc;
+      color: #7f6000;
+    }
+
+    .estado-pendiente {
+      background: #f4cccc;
+      color: #9c0006;
+    }
+
+    .estado-logistico {
+      background: #d9eaf7;
+      color: #1f4e78;
+    }
+
+    .mensaje {
+      display: none;
+      padding: 12px;
+      margin-bottom: 15px;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+
+    .mensaje-error {
+      display: block;
+      background: #f4cccc;
+      color: #9c0006;
+    }
+
+    .mensaje-info {
+      display: block;
+      background: #d9eaf7;
+      color: #1f4e78;
+    }
+
+    .oculto {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Consulta integral de importación</h1>
+
+  <div id="mensaje" class="mensaje"></div>
+
+  <div class="panel selector">
+    <div>
+      <label for="orden">
+        Orden / PI
+      </label>
+
+      <select id="orden">
+        <option value="">
+          Cargando órdenes...
+        </option>
+      </select>
+    </div>
+
+    <div>
+      <button
+        id="btnConsultar"
+        onclick="consultarPi()"
+        disabled
+      >
+        Consultar
+      </button>
+    </div>
+  </div>
+
+  <div id="contenido" class="oculto">
+
+    <div class="panel">
+      <div class="cabecera">
+
+        <div class="campo">
+          <div class="campo-titulo">
+            PI / Orden
+          </div>
+          <div
+            id="cabIdOrden"
+            class="campo-valor"
+          ></div>
+        </div>
+
+        <div class="campo">
+          <div class="campo-titulo">
+            Proveedor
+          </div>
+          <div
+            id="cabProveedor"
+            class="campo-valor"
+          ></div>
+        </div>
+
+        <div class="campo">
+          <div class="campo-titulo">
+            Estado
+          </div>
+          <div
+            id="cabEstado"
+            class="campo-valor"
+          ></div>
+        </div>
+
+        <div class="campo">
+          <div class="campo-titulo">
+            Situación
+          </div>
+          <div
+            id="cabSituacion"
+            class="campo-valor"
+          ></div>
+        </div>
+
+        <div class="campo">
+          <div class="campo-titulo">
+            Legajo / Contenedor
+          </div>
+          <div
+            id="cabLegajo"
+            class="campo-valor"
+          ></div>
+        </div>
+
+        <div class="campo">
+          <div class="campo-titulo">
+            Fecha orden
+          </div>
+          <div
+            id="cabFechaOrden"
+            class="campo-valor"
+          ></div>
+        </div>
+
+        <div class="campo">
+          <div class="campo-titulo">
+            Fecha embarque
+          </div>
+          <div
+            id="cabFechaEmbarque"
+            class="campo-valor"
+          ></div>
+        </div>
+
+        <div class="campo">
+          <div class="campo-titulo">
+            Importe
+          </div>
+          <div
+            id="cabImporte"
+            class="campo-valor"
+          ></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="resumen">
+
+        <div class="tarjeta">
+          <div
+            id="resLineas"
+            class="tarjeta-numero"
+          ></div>
+          <div class="tarjeta-texto">
+            LÍNEAS
+          </div>
+        </div>
+
+        <div class="tarjeta">
+          <div
+            id="resPedido"
+            class="tarjeta-numero"
+          ></div>
+          <div class="tarjeta-texto">
+            UNIDADES PEDIDAS
+          </div>
+        </div>
+
+        <div class="tarjeta">
+          <div
+            id="resRecibido"
+            class="tarjeta-numero"
+          ></div>
+          <div class="tarjeta-texto">
+            UNIDADES RECIBIDAS
+          </div>
+        </div>
+
+        <div class="tarjeta">
+          <div
+            id="resPendiente"
+            class="tarjeta-numero"
+          ></div>
+          <div class="tarjeta-texto">
+            UNIDADES PENDIENTES
+          </div>
+        </div>
+
+        <div class="tarjeta">
+          <div
+            id="resPorcentaje"
+            class="tarjeta-numero"
+          ></div>
+          <div class="tarjeta-texto">
+            AVANCE
+          </div>
+        </div>
+
+      </div>
+
+      <div class="barra-contenedor">
+        <div
+          id="barraAvance"
+          class="barra"
+        ></div>
+      </div>
+
+      <div
+        id="avanceTexto"
+        class="avance-texto"
+      ></div>
+    </div>
+
+    <div class="panel">
+      <div class="tabla-contenedor">
+
+        <table>
+          <thead>
+            <tr>
+              <th>Marca</th>
+              <th>SKU</th>
+              <th>ITEM</th>
+              <th class="numero">Pedido</th>
+              <th class="numero">Recibido</th>
+              <th class="numero">Pendiente</th>
+              <th class="numero">Precio</th>
+              <th class="numero">Importe</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+
+          <tbody id="detalleBody">
+          </tbody>
+        </table>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    document.addEventListener(
+      'DOMContentLoaded',
+      cargarOrdenes
+    );
+
+
+    function cargarOrdenes() {
+      mostrarMensaje(
+        'Cargando órdenes...',
+        'info'
+      );
+
+      google.script.run
+        .withSuccessHandler(
+          ordenes => {
+            const select =
+              document.getElementById(
+                'orden'
+              );
+
+            select.innerHTML =
+              '<option value="">' +
+              'Seleccione una orden' +
+              '</option>';
+
+            ordenes.forEach(orden => {
+              const option =
+                document.createElement(
+                  'option'
+                );
+
+              option.value =
+                orden.idOrden;
+
+              option.textContent =
+                orden.idOrden +
+                ' - ' +
+                orden.proveedor;
+
+              select.appendChild(
+                option
+              );
+            });
+
+            document.getElementById(
+              'btnConsultar'
+            ).disabled = false;
+
+            limpiarMensaje();
+          }
+        )
+        .withFailureHandler(
+          mostrarError
+        )
+        .obtenerOrdenesConsultaPi();
+    }
+
+
+    function consultarPi() {
+      const idOrden =
+        document.getElementById(
+          'orden'
+        ).value;
+
+      if (!idOrden) {
+        mostrarMensaje(
+          'Seleccione una orden.',
+          'error'
+        );
+        return;
+      }
+
+      document.getElementById(
+        'btnConsultar'
+      ).disabled = true;
+
+      mostrarMensaje(
+        'Consultando información...',
+        'info'
+      );
+
+      google.script.run
+        .withSuccessHandler(
+          resultado => {
+            renderizarConsulta(
+              resultado
+            );
+
+            document.getElementById(
+              'btnConsultar'
+            ).disabled = false;
+
+            limpiarMensaje();
+          }
+        )
+        .withFailureHandler(
+          error => {
+            document.getElementById(
+              'btnConsultar'
+            ).disabled = false;
+
+            mostrarError(error);
+          }
+        )
+        .obtenerConsultaPi(
+          idOrden
+        );
+    }
+
+
+    function renderizarConsulta(
+      resultado
+    ) {
+      const cab = resultado.cabecera;
+      const res = resultado.resumen;
+
+      ponerTexto(
+        'cabIdOrden',
+        cab.idOrden
+      );
+
+      ponerTexto(
+        'cabProveedor',
+        cab.proveedor
+      );
+
+      ponerTexto(
+        'cabEstado',
+        cab.estado
+      );
+
+      ponerTexto(
+        'cabSituacion',
+        cab.situacion
+      );
+
+      ponerTexto(
+        'cabLegajo',
+        cab.legajo
+      );
+
+      ponerTexto(
+        'cabFechaOrden',
+        cab.fechaOrden
+      );
+
+      ponerTexto(
+        'cabFechaEmbarque',
+        cab.fechaEmbarque
+      );
+
+      ponerTexto(
+        'cabImporte',
+        cab.moneda +
+        ' ' +
+        formatearNumero(
+          cab.importe
+        )
+      );
+
+      ponerTexto(
+        'resLineas',
+        formatearNumero(
+          res.lineas
+        )
+      );
+
+      ponerTexto(
+        'resPedido',
+        formatearNumero(
+          res.cantidadPedida
+        )
+      );
+
+      ponerTexto(
+        'resRecibido',
+        formatearNumero(
+          res.cantidadRecibida
+        )
+      );
+
+      ponerTexto(
+        'resPendiente',
+        formatearNumero(
+          res.cantidadPendiente
+        )
+      );
+
+      const porcentaje =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            Number(
+              res.porcentajeRecibido
+            ) || 0
+          )
+        );
+
+      ponerTexto(
+        'resPorcentaje',
+        porcentaje.toFixed(1) + '%'
+      );
+
+      document.getElementById(
+        'barraAvance'
+      ).style.width =
+        porcentaje + '%';
+
+      ponerTexto(
+        'avanceTexto',
+        formatearNumero(
+          res.cantidadRecibida
+        ) +
+        ' de ' +
+        formatearNumero(
+          res.cantidadPedida
+        ) +
+        ' unidades recibidas'
+      );
+
+      renderizarDetalle(
+        resultado.lineas
+      );
+
+      document.getElementById(
+        'contenido'
+      ).classList.remove(
+        'oculto'
+      );
+    }
+
+
+    function renderizarDetalle(
+      lineas
+    ) {
+      const body =
+        document.getElementById(
+          'detalleBody'
+        );
+
+      body.innerHTML = '';
+
+      if (!lineas.length) {
+        body.innerHTML =
+          '<tr>' +
+          '<td colspan="9">' +
+          'La orden no tiene líneas.' +
+          '</td>' +
+          '</tr>';
+
+        return;
+      }
+
+      lineas.forEach(linea => {
+        const tr =
+          document.createElement(
+            'tr'
+          );
+
+        tr.innerHTML =
+          '<td>' +
+          escaparHtml(linea.marca) +
+          '</td>' +
+
+          '<td>' +
+          escaparHtml(linea.sku) +
+          '</td>' +
+
+          '<td>' +
+          escaparHtml(linea.item) +
+          '</td>' +
+
+          '<td class="numero">' +
+          formatearNumero(
+            linea.cantidadPedida
+          ) +
+          '</td>' +
+
+          '<td class="numero">' +
+          formatearNumero(
+            linea.cantidadRecibida
+          ) +
+          '</td>' +
+
+          '<td class="numero">' +
+          formatearNumero(
+            linea.cantidadPendiente
+          ) +
+          '</td>' +
+
+          '<td class="numero">' +
+          formatearNumero(
+            linea.precioUnitario
+          ) +
+          '</td>' +
+
+          '<td class="numero">' +
+          formatearNumero(
+            linea.importeLinea
+          ) +
+          '</td>' +
+
+          '<td>' +
+          crearEstadoHtml(
+            linea.estado
+          ) +
+          '</td>';
+
+        body.appendChild(tr);
+      });
+    }
+
+
+    function crearEstadoHtml(
+      estado
+    ) {
+      const texto =
+        String(estado || '')
+          .toUpperCase();
+
+      let clase =
+        'estado-logistico';
+
+      if (texto === 'RECIBIDO') {
+        clase =
+          'estado-recibido';
+
+      } else if (
+        texto === 'PARCIAL'
+      ) {
+        clase =
+          'estado-parcial';
+
+      } else if (
+        texto === 'PENDIENTE'
+      ) {
+        clase =
+          'estado-pendiente';
+      }
+
+      return (
+        '<span class="estado ' +
+        clase +
+        '">' +
+        escaparHtml(texto) +
+        '</span>'
+      );
+    }
+
+
+    function ponerTexto(
+      id,
+      valor
+    ) {
+      document.getElementById(
+        id
+      ).textContent =
+        valor === null ||
+        valor === undefined ||
+        valor === ''
+          ? '-'
+          : valor;
+    }
+
+
+    function formatearNumero(
+      valor
+    ) {
+      const numero =
+        Number(valor);
+
+      return Number.isFinite(numero)
+        ? numero.toLocaleString(
+            'es-AR',
+            {
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 2
+            }
+          )
+        : '0';
+    }
+
+
+    function escaparHtml(
+      valor
+    ) {
+      return String(
+        valor === null ||
+        valor === undefined
+          ? ''
+          : valor
+      )
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+
+    function mostrarMensaje(
+      texto,
+      tipo
+    ) {
+      const mensaje =
+        document.getElementById(
+          'mensaje'
+        );
+
+      mensaje.textContent = texto;
+
+      mensaje.className =
+        'mensaje mensaje-' + tipo;
+    }
+
+
+    function limpiarMensaje() {
+      const mensaje =
+        document.getElementById(
+          'mensaje'
+        );
+
+      mensaje.textContent = '';
+      mensaje.className = 'mensaje';
+    }
+
+
+    function mostrarError(error) {
+      mostrarMensaje(
+        error &&
+        error.message
+          ? error.message
+          : String(error),
+        'error'
+      );
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;padding:24px;color:#1f2937;background:#f7f9fc}
+    .card{background:#fff;border:1px solid #dbe3ec;border-radius:12px;padding:22px;box-shadow:0 4px 14px rgba(31,78,120,.08)}
+    h2{margin:0 0 8px;color:#1f4e78}
+    .subtitle{margin-bottom:18px;color:#5f6b78;font-size:14px;line-height:1.45}
+    .archivo-card{border:1px solid #cdd9e5;background:#f7fbff;border-radius:10px;padding:16px;margin-top:12px}
+    .archivo-nombre{font-weight:bold;color:#1f4e78;font-size:15px;margin-bottom:8px;word-break:break-word}
+    .archivo-meta{color:#5f6b78;font-size:13px;line-height:1.5}
+    .actions{display:flex;gap:10px;margin-top:20px}
+    button{border:0;border-radius:7px;padding:11px 18px;font-weight:bold;cursor:pointer}
+    .primary{color:#fff;background:#1f4e78}
+    .secondary{color:#1f4e78;background:#e8f0f7}
+    button:disabled{cursor:not-allowed;opacity:.55}
+    #estado{margin-top:16px;padding:12px;border-radius:8px;display:none;white-space:pre-line;line-height:1.45;font-size:14px}
+    .info{display:block!important;background:#eaf2f8;color:#1f4e78}
+    .ok{display:block!important;background:#e9f6ec;color:#246b35}
+    .error{display:block!important;background:#fdecec;color:#9c0006}
+    .progress{height:8px;border-radius:10px;overflow:hidden;background:#e4eaf0;margin-top:14px;display:none}
+    .progress>div{width:0;height:100%;background:#1f4e78;transition:width .25s}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Importar ventas</h2>
+
+    <div class="subtitle">
+      El sistema buscará el XLSX más reciente dentro de la carpeta
+      de Google Drive configurada y reemplazará completamente la hoja
+      <strong>VENTAS</strong>.
+    </div>
+
+    <div class="archivo-card">
+      <div class="archivo-nombre" id="archivoNombre">
+        Buscando archivo...
+      </div>
+      <div class="archivo-meta" id="archivoMeta"></div>
+    </div>
+
+    <div class="progress" id="progreso">
+      <div id="barra"></div>
+    </div>
+
+    <div id="estado"></div>
+
+    <div class="actions">
+      <button class="primary" id="btnImportar" onclick="importar()" disabled>
+        Importar
+      </button>
+      <button class="secondary" id="btnActualizar" onclick="buscarArchivo()">
+        Actualizar
+      </button>
+      <button class="secondary" onclick="google.script.host.close()">
+        Cerrar
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let archivoActual = null;
+
+    window.onload = function() {
+      buscarArchivo();
+    };
+
+    function buscarArchivo() {
+      archivoActual = null;
+      document.getElementById('btnImportar').disabled = true;
+      document.getElementById('archivoNombre').textContent = 'Buscando archivo...';
+      document.getElementById('archivoMeta').textContent = '';
+      mostrarEstado('Buscando el XLSX más reciente en Google Drive...','info');
+
+      google.script.run
+        .withSuccessHandler(function(r) {
+          if (!r || !r.encontrado) {
+            document.getElementById('archivoNombre').textContent = 'No se encontró ningún XLSX';
+            mostrarEstado(r && r.mensaje ? r.mensaje : 'No se encontró ningún archivo .xlsx.','error');
+            return;
+          }
+
+          archivoActual = r;
+          document.getElementById('archivoNombre').textContent = r.nombre;
+          document.getElementById('archivoMeta').textContent =
+            'Última modificación: ' + r.fecha + ' · Tamaño: ' + r.mb + ' MB';
+          document.getElementById('btnImportar').disabled = false;
+          ocultarEstado();
+        })
+        .withFailureHandler(function(e) {
+          document.getElementById('archivoNombre').textContent = 'Error al acceder a Google Drive';
+          mostrarEstado(e && e.message ? e.message : String(e),'error');
+        })
+        .obtenerArchivoVentasPendiente();
+    }
+
+    function importar() {
+      if (!archivoActual || !archivoActual.id) {
+        mostrarEstado('Primero actualizá la búsqueda del archivo.','error');
+        return;
+      }
+
+      document.getElementById('btnImportar').disabled = true;
+      document.getElementById('btnActualizar').disabled = true;
+
+      mostrarProgreso(45);
+      mostrarEstado(
+        'Procesando ' + archivoActual.nombre + '...\nNo cierres esta ventana.',
+        'info'
+      );
+
+      google.script.run
+        .withSuccessHandler(importacionCorrecta)
+        .withFailureHandler(importacionFallida)
+        .importarVentasDesdeDrive(archivoActual.id);
+    }
+
+    function importacionCorrecta(r) {
+      mostrarProgreso(100);
+
+      const meses = Array.isArray(r.mesesDetectados)
+        ? r.mesesDetectados.join(', ')
+        : '';
+
+      mostrarEstado(
+        'Importación completada.\n\n' +
+        'Archivo: ' + r.archivo + '\n' +
+        'Filas del archivo: ' + r.filasOrigen + '\n' +
+        'Filas importadas: ' + r.filasImportadas + '\n' +
+        'Sin Cod_BAM: ' + r.sinCodBam + '\n' +
+        'SKU duplicados: ' + r.duplicados + '\n' +
+        'Meses detectados: ' + meses + '\n' +
+        'Duración: ' + Math.round(r.duracionMs / 1000) + ' segundos.',
+        'ok'
+      );
+
+      document.getElementById('btnActualizar').disabled = false;
+    }
+
+    function importacionFallida(e) {
+      mostrarProgreso(0);
+      mostrarEstado(
+        'Error al importar:\n' +
+        (e && e.message ? e.message : String(e)),
+        'error'
+      );
+
+      document.getElementById('btnImportar').disabled = false;
+      document.getElementById('btnActualizar').disabled = false;
+    }
+
+    function mostrarEstado(texto, clase) {
+      const estado = document.getElementById('estado');
+      estado.className = clase;
+      estado.textContent = texto;
+    }
+
+    function ocultarEstado() {
+      const estado = document.getElementById('estado');
+      estado.className = '';
+      estado.textContent = '';
+    }
+
+    function mostrarProgreso(valor) {
+      const contenedor = document.getElementById('progreso');
+      const barra = document.getElementById('barra');
+
+      contenedor.style.display = valor > 0 ? 'block' : 'none';
+      barra.style.width = valor + '%';
+    }
+  </script>
+</body>
+</html>

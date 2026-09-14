@@ -43,10 +43,10 @@ export const portalAccesses: PortalAccess[] = [
   {
     id: "compras",
     name: "Compras",
-    description: "Proveedores y documentación de compras.",
+    description: "Dashboard de stock, cobertura y compras por marca.",
     href: "/areas/compras",
     eyebrow: "Abastecimiento",
-    enabled: false,
+    enabled: true,
   },
   {
     id: "comex",

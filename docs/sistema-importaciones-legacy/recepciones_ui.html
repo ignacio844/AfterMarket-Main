@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 22px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      color: #263238;
+      background: #f5f7f9;
+    }
+
+    h2 {
+      margin: 0 0 20px;
+      color: #1f4e78;
+      font-size: 24px;
+    }
+
+    .panel {
+      background: white;
+      border: 1px solid #d9e1e8;
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    .fila {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .campo {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: #37474f;
+    }
+
+    select,
+    input,
+    textarea {
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid #b8c4ce;
+      border-radius: 4px;
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+    }
+
+    select:focus,
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #1f4e78;
+    }
+
+    input[readonly] {
+      background: #f0f3f5;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 75px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+
+    th {
+      background: #1f4e78;
+      color: white;
+      padding: 10px 8px;
+      text-align: left;
+      position: sticky;
+      top: 0;
+    }
+
+    td {
+      padding: 8px;
+      border-bottom: 1px solid #dde3e8;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #f7fafc;
+    }
+
+    .numero {
+      text-align: right;
+    }
+
+    .cantidad-recibir {
+      width: 110px;
+      text-align: right;
+    }
+
+    .contenedor-tabla {
+      max-height: 380px;
+      overflow-y: auto;
+      border: 1px solid #d9e1e8;
+      border-radius: 5px;
+    }
+
+    .acciones {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button {
+      border: none;
+      border-radius: 5px;
+      padding: 10px 20px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .boton-principal {
+      background: #1f4e78;
+      color: white;
+      font-weight: bold;
+    }
+
+    .boton-principal:hover {
+      background: #173b5c;
+    }
+
+    .boton-principal:disabled {
+      background: #9caab5;
+      cursor: not-allowed;
+    }
+
+    .boton-secundario {
+      background: #e5e9ec;
+      color: #263238;
+    }
+
+    .boton-secundario:hover {
+      background: #d5dce1;
+    }
+
+    .mensaje {
+      display: none;
+      margin-bottom: 16px;
+      padding: 11px 14px;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+
+    .mensaje-error {
+      background: #f4cccc;
+      color: #9c0006;
+      border: 1px solid #e6b8b7;
+    }
+
+    .mensaje-exito {
+      background: #d9ead3;
+      color: #274e13;
+      border: 1px solid #b6d7a8;
+    }
+
+    .mensaje-info {
+      background: #d9eaf7;
+      color: #1f4e78;
+      border: 1px solid #b4cfe5;
+    }
+
+    .cargando {
+      padding: 25px;
+      text-align: center;
+      color: #607d8b;
+    }
+
+    .sin-datos {
+      padding: 25px;
+      text-align: center;
+      color: #777;
+    }
+
+    .resumen {
+      margin-top: 12px;
+      text-align: right;
+      font-weight: bold;
+      color: #1f4e78;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>Recepción de mercadería</h2>
+
+  <div id="mensaje" class="mensaje"></div>
+
+  <div class="panel">
+    <div class="fila">
+      <div class="campo">
+        <label for="cmbPI">Orden / PI</label>
+
+        <select id="cmbPI" disabled>
+          <option value="">Cargando órdenes...</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label for="fechaRecepcion">Fecha de recepción</label>
+
+        <input
+          id="fechaRecepcion"
+          type="date"
+        >
+      </div>
+    </div>
+
+    <div class="fila">
+      <div class="campo">
+        <label for="proveedor">Proveedor</label>
+
+        <input
+          id="proveedor"
+          type="text"
+          readonly
+        >
+      </div>
+
+      <div class="campo">
+        <label for="legajo">Legajo / Contenedor</label>
+
+        <input
+          id="legajo"
+          type="text"
+          readonly
+        >
+      </div>
+
+      <div class="campo">
+        <label for="estadoOrden">Estado</label>
+
+        <input
+          id="estadoOrden"
+          type="text"
+          readonly
+        >
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div id="contenedorDetalle">
+      <div class="sin-datos">
+        Seleccione una orden para consultar los productos pendientes.
+      </div>
+    </div>
+
+    <div id="resumen" class="resumen"></div>
+  </div>
+
+  <div class="panel">
+    <label for="observaciones">Observaciones</label>
+
+    <textarea
+      id="observaciones"
+      placeholder="Observaciones opcionales de la recepción"
+    ></textarea>
+
+    <div class="acciones">
+      <button
+        class="boton-secundario"
+        type="button"
+        onclick="google.script.host.close()"
+      >
+        Cerrar
+      </button>
+
+      <button
+        id="btnRegistrar"
+        class="boton-principal"
+        type="button"
+        disabled
+        onclick="registrarRecepcion()"
+      >
+        Registrar recepción
+      </button>
+    </div>
+  </div>
+
+
+  <script>
+    let ordenes = [];
+    let detalleActual = [];
+
+    document.addEventListener(
+      'DOMContentLoaded',
+      iniciarPantalla
+    );
+
+
+    function iniciarPantalla() {
+      establecerFechaActual();
+
+      document
+        .getElementById('cmbPI')
+        .addEventListener(
+          'change',
+          seleccionarOrden
+        );
+
+      google.script.run
+        .withSuccessHandler(cargarOrdenes)
+        .withFailureHandler(mostrarErrorServidor)
+        .obtenerOrdenesPendientes();
+    }
+
+
+    function establecerFechaActual() {
+      const hoy = new Date();
+
+      const anio = hoy.getFullYear();
+      const mes = String(
+        hoy.getMonth() + 1
+      ).padStart(2, '0');
+
+      const dia = String(
+        hoy.getDate()
+      ).padStart(2, '0');
+
+      document.getElementById(
+        'fechaRecepcion'
+      ).value =
+        `${anio}-${mes}-${dia}`;
+    }
+
+
+    function cargarOrdenes(lista) {
+      ordenes = Array.isArray(lista)
+        ? lista
+        : [];
+
+      const cmb =
+        document.getElementById('cmbPI');
+
+      cmb.innerHTML = '';
+
+      const opcionInicial =
+        document.createElement('option');
+
+      opcionInicial.value = '';
+
+      opcionInicial.textContent =
+        'Seleccione una orden';
+
+      cmb.appendChild(opcionInicial);
+
+      ordenes.forEach(orden => {
+        const opcion =
+          document.createElement('option');
+
+        opcion.value =
+          orden.idOrden || '';
+
+        const numeroPI =
+          orden.numeroPI ||
+          orden.idOrden ||
+          'Sin PI';
+
+        const proveedor =
+          orden.proveedor
+            ? ` - ${orden.proveedor}`
+            : '';
+
+        opcion.textContent =
+          numeroPI + proveedor;
+
+        cmb.appendChild(opcion);
+      });
+
+      cmb.disabled = false;
+
+      if (ordenes.length === 0) {
+        mostrarMensaje(
+          'No se encontraron órdenes pendientes.',
+          'info'
+        );
+      }
+    }
+
+
+    function seleccionarOrden() {
+      limpiarMensaje();
+
+      const idOrden =
+        document.getElementById(
+          'cmbPI'
+        ).value;
+
+      limpiarDetalle();
+
+      if (!idOrden) {
+        limpiarCabecera();
+        return;
+      }
+
+      const orden = ordenes.find(
+        item =>
+          String(item.idOrden) ===
+          String(idOrden)
+      );
+
+      if (orden) {
+        document.getElementById(
+          'proveedor'
+        ).value =
+          orden.proveedor || '';
+
+        document.getElementById(
+          'legajo'
+        ).value =
+          orden.legajo || '';
+
+        document.getElementById(
+          'estadoOrden'
+        ).value =
+          orden.estado || '';
+      }
+
+      document.getElementById(
+        'contenedorDetalle'
+      ).innerHTML =
+        '<div class="cargando">' +
+        'Cargando productos pendientes...' +
+        '</div>';
+
+      google.script.run
+        .withSuccessHandler(
+          mostrarDetalle
+        )
+        .withFailureHandler(
+          mostrarErrorServidor
+        )
+        .obtenerDetalleRecepcion(
+          idOrden
+        );
+    }
+
+
+    function mostrarDetalle(lista) {
+      detalleActual =
+        Array.isArray(lista)
+          ? lista
+          : [];
+
+      const contenedor =
+        document.getElementById(
+          'contenedorDetalle'
+        );
+
+      if (detalleActual.length === 0) {
+        contenedor.innerHTML =
+          '<div class="sin-datos">' +
+          'La orden no tiene productos pendientes.' +
+          '</div>';
+
+        document.getElementById(
+          'btnRegistrar'
+        ).disabled = true;
+
+        document.getElementById(
+          'resumen'
+        ).textContent = '';
+
+        return;
+      }
+
+      let html =
+        '<div class="contenedor-tabla">' +
+        '<table>' +
+        '<thead>' +
+        '<tr>' +
+        '<th>Marca</th>' +
+        '<th>SKU</th>' +
+        '<th>ITEM</th>' +
+        '<th class="numero">Pendiente</th>' +
+        '<th class="numero">Recibido acumulado</th>' +
+        '<th class="numero">Recibir ahora</th>' +
+        '</tr>' +
+        '</thead>' +
+        '<tbody>';
+
+      detalleActual.forEach(
+        (linea, indice) => {
+          const pendiente =
+            numeroSeguro(
+              linea.cantidadPendiente
+            );
+
+          const recibido =
+            numeroSeguro(
+              linea.cantidadRecibida
+            );
+
+          html +=
+            '<tr>' +
+
+            '<td>' +
+            escaparHtml(
+              linea.marca || ''
+            ) +
+            '</td>' +
+
+            '<td>' +
+            escaparHtml(
+              linea.sku ||
+              linea.item ||
+              ''
+            ) +
+            '</td>' +
+
+            '<td>' +
+            escaparHtml(
+              linea.item || ''
+            ) +
+            '</td>' +
+
+            '<td class="numero">' +
+            formatearNumero(
+              pendiente
+            ) +
+            '</td>' +
+
+            '<td class="numero">' +
+            formatearNumero(
+              recibido
+            ) +
+            '</td>' +
+
+            '<td class="numero">' +
+
+            '<input ' +
+            'type="number" ' +
+            'class="cantidad-recibir" ' +
+            `id="recibir_${indice}" ` +
+            'min="0" ' +
+            `max="${pendiente}" ` +
+            'step="1" ' +
+            'value="0" ' +
+            `data-pendiente="${pendiente}" ` +
+            'oninput="actualizarResumen()" ' +
+            `onchange="validarCantidad(${indice})"` +
+            '>' +
+
+            '</td>' +
+
+            '</tr>';
+        }
+      );
+
+      html +=
+        '</tbody>' +
+        '</table>' +
+        '</div>';
+
+      contenedor.innerHTML = html;
+
+      document.getElementById(
+        'btnRegistrar'
+      ).disabled = false;
+
+      actualizarResumen();
+    }
+
+
+    function validarCantidad(indice) {
+      const input = document.getElementById(
+        `recibir_${indice}`
+      );
+
+      const pendiente = numeroSeguro(
+        input.dataset.pendiente
+      );
+
+      let cantidad = numeroSeguro(
+        input.value
+      );
+
+      if (cantidad < 0) {
+        cantidad = 0;
+        input.value = 0;
+      }
+
+      if (cantidad > pendiente) {
+        input.value = pendiente;
+
+        mostrarMensaje(
+          'La cantidad recibida no puede superar la cantidad pendiente.',
+          'error'
+        );
+      } else {
+        limpiarMensaje();
+      }
+
+      actualizarResumen();
+    }
+
+
+    function actualizarResumen() {
+      let lineasSeleccionadas = 0;
+      let cantidadTotal = 0;
+
+      detalleActual.forEach(
+        (linea, indice) => {
+          const input =
+            document.getElementById(
+              `recibir_${indice}`
+            );
+
+          if (!input) return;
+
+          const cantidad =
+            numeroSeguro(
+              input.value
+            );
+
+          if (cantidad > 0) {
+            lineasSeleccionadas++;
+            cantidadTotal += cantidad;
+          }
+        }
+      );
+
+      document.getElementById(
+        'resumen'
+      ).textContent =
+        `Líneas seleccionadas: ${lineasSeleccionadas}` +
+        ` | Cantidad total: ${formatearNumero(cantidadTotal)}`;
+    }
+
+
+    function registrarRecepcion() {
+      limpiarMensaje();
+
+      const idOrden =
+        document.getElementById(
+          'cmbPI'
+        ).value;
+
+      const fechaRecepcion =
+        document.getElementById(
+          'fechaRecepcion'
+        ).value;
+
+      if (!idOrden) {
+        mostrarMensaje(
+          'Debe seleccionar una orden.',
+          'error'
+        );
+        return;
+      }
+
+      if (!fechaRecepcion) {
+        mostrarMensaje(
+          'Debe indicar la fecha de recepción.',
+          'error'
+        );
+        return;
+      }
+
+      const lineas = [];
+
+      for (
+        let indice = 0;
+        indice < detalleActual.length;
+        indice++
+      ) {
+        const linea =
+          detalleActual[indice];
+
+        const input =
+          document.getElementById(
+            `recibir_${indice}`
+          );
+
+        const cantidad =
+          numeroSeguro(
+            input.value
+          );
+
+        const pendiente =
+          numeroSeguro(
+            linea.cantidadPendiente
+          );
+
+        if (cantidad < 0) {
+          mostrarMensaje(
+            'No se permiten cantidades negativas.',
+            'error'
+          );
+          return;
+        }
+
+        if (cantidad > pendiente) {
+          mostrarMensaje(
+            `La cantidad recibida del ITEM ` +
+            `${linea.item || linea.sku} ` +
+            `supera la cantidad pendiente.`,
+            'error'
+          );
+          return;
+        }
+
+        if (cantidad > 0) {
+          lineas.push({
+            idDetalle:
+              linea.idDetalle,
+
+            item:
+              linea.item || '',
+
+            sku:
+              linea.sku || '',
+
+            cantidadRecibida:
+              cantidad
+          });
+        }
+      }
+
+      if (lineas.length === 0) {
+        mostrarMensaje(
+          'Debe ingresar una cantidad recibida en al menos una línea.',
+          'error'
+        );
+        return;
+      }
+
+      const datos = {
+        idOrden: idOrden,
+
+        fechaRecepcion:
+          fechaRecepcion,
+
+        observaciones:
+          document.getElementById(
+            'observaciones'
+          ).value.trim(),
+
+        lineas: lineas
+      };
+
+      bloquearPantalla(true);
+
+      mostrarMensaje(
+        'Registrando recepción...',
+        'info'
+      );
+
+      google.script.run
+        .withSuccessHandler(
+          recepcionRegistrada
+        )
+        .withFailureHandler(
+          errorRegistro
+        )
+        .registrarRecepcion(
+          datos
+        );
+    }
+
+
+    function recepcionRegistrada(resultado) {
+      bloquearPantalla(false);
+
+      const mensaje =
+        resultado &&
+        resultado.mensaje
+          ? resultado.mensaje
+          : 'La recepción fue registrada correctamente.';
+
+      mostrarMensaje(
+        mensaje,
+        'exito'
+      );
+
+      document.getElementById(
+        'observaciones'
+      ).value = '';
+
+      seleccionarOrden();
+    }
+
+
+    function errorRegistro(error) {
+      bloquearPantalla(false);
+      mostrarErrorServidor(error);
+    }
+
+
+    function bloquearPantalla(bloquear) {
+      document.getElementById(
+        'cmbPI'
+      ).disabled = bloquear;
+
+      document.getElementById(
+        'fechaRecepcion'
+      ).disabled = bloquear;
+
+      document.getElementById(
+        'observaciones'
+      ).disabled = bloquear;
+
+      document.getElementById(
+        'btnRegistrar'
+      ).disabled = bloquear;
+    }
+
+
+    function limpiarCabecera() {
+      document.getElementById(
+        'proveedor'
+      ).value = '';
+
+      document.getElementById(
+        'legajo'
+      ).value = '';
+
+      document.getElementById(
+        'estadoOrden'
+      ).value = '';
+    }
+
+
+    function limpiarDetalle() {
+      detalleActual = [];
+
+      document.getElementById(
+        'contenedorDetalle'
+      ).innerHTML =
+        '<div class="sin-datos">' +
+        'Seleccione una orden para consultar los productos pendientes.' +
+        '</div>';
+
+      document.getElementById(
+        'resumen'
+      ).textContent = '';
+
+      document.getElementById(
+        'btnRegistrar'
+      ).disabled = true;
+    }
+
+
+    function mostrarErrorServidor(error) {
+      const mensaje =
+        error &&
+        error.message
+          ? error.message
+          : String(error);
+
+      mostrarMensaje(
+        mensaje,
+        'error'
+      );
+
+      document.getElementById(
+        'contenedorDetalle'
+      ).innerHTML =
+        '<div class="sin-datos">' +
+        'No se pudieron cargar los datos.' +
+        '</div>';
+    }
+
+
+    function mostrarMensaje(
+      texto,
+      tipo
+    ) {
+      const elemento =
+        document.getElementById(
+          'mensaje'
+        );
+
+      elemento.className =
+        'mensaje mensaje-' + tipo;
+
+      elemento.textContent = texto;
+      elemento.style.display = 'block';
+    }
+
+
+    function limpiarMensaje() {
+      const elemento =
+        document.getElementById(
+          'mensaje'
+        );
+
+      elemento.style.display = 'none';
+      elemento.textContent = '';
+    }
+
+
+    function numeroSeguro(valor) {
+      const numero =
+        Number(valor);
+
+      return Number.isFinite(numero)
+        ? numero
+        : 0;
+    }
+
+
+    function formatearNumero(valor) {
+      return numeroSeguro(valor)
+        .toLocaleString(
+          'es-AR',
+          {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+          }
+        );
+    }
+
+
+    function escaparHtml(valor) {
+      return String(valor)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+
+</body>
+</html>

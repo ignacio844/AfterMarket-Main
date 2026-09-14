@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+
+  <script
+    src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js">
+  </script>
+
+  <style>
+    :root {
+      --azul: #17365d;
+      --azul-medio: #1f4e78;
+      --azul-claro: #d9eaf7;
+      --fondo: #f5f7fa;
+      --borde: #d7dce2;
+      --texto: #202124;
+      --secundario: #5f6368;
+      --blanco: #ffffff;
+      --rojo: #b3261e;
+      --verde: #137333;
+      --verde-claro: #e6f4ea;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--fondo);
+      color: var(--texto);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cabecera {
+      background: var(--azul);
+      color: var(--blanco);
+      padding: 18px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cabecera h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .version {
+      font-size: 12px;
+      opacity: .85;
+    }
+
+    .contenido {
+      padding: 20px 24px 24px;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--blanco);
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    }
+
+    .controles-deposito {
+      padding: 12px 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .control-deposito {
+      border: 1px solid var(--borde);
+      border-radius: 7px;
+      padding: 10px 12px;
+      background: #fafcfd;
+      font-size: 12px;
+      color: var(--secundario);
+    }
+
+    .control-deposito strong {
+      display: block;
+      color: var(--azul);
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .filtros {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: 1.4fr 1.5fr 1.2fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .campo {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--secundario);
+    }
+
+    input,
+    select {
+      width: 100%;
+      height: 38px;
+      border: 1px solid var(--borde);
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 14px;
+      background: white;
+    }
+
+    button {
+      height: 38px;
+      border: 0;
+      border-radius: 6px;
+      padding: 0 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .primario {
+      background: var(--azul-medio);
+      color: white;
+    }
+
+    .secundario {
+      background: var(--azul-claro);
+      color: var(--azul);
+    }
+
+    .barra {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--borde);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .estado {
+      font-size: 13px;
+      color: var(--secundario);
+    }
+
+    .tabla-contenedor {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--azul-medio);
+      color: white;
+      text-align: left;
+      font-size: 12px;
+      padding: 10px;
+    }
+
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #eceff1;
+      font-size: 13px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    tbody tr:hover {
+      background: #f0f6fb;
+    }
+
+    .pie {
+      padding: 10px 16px;
+      border-top: 1px solid var(--borde);
+      color: var(--secundario);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .mensaje {
+      padding: 28px 18px;
+      text-align: center;
+      color: var(--secundario);
+    }
+
+    .error {
+      color: var(--rojo);
+    }
+
+    .ok {
+      color: var(--verde);
+    }
+
+    .modal-fondo {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.42);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-fondo.visible {
+      display: flex;
+    }
+
+    .modal {
+      width: min(720px, 92vw);
+      max-height: 86vh;
+      overflow: auto;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.28);
+    }
+
+    .modal-titulo {
+      background: var(--azul);
+      color: white;
+      padding: 16px 20px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .modal-contenido {
+      padding: 20px;
+    }
+
+    .selector-archivo {
+      border: 2px dashed #9bb8d1;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      background: #f8fbfd;
+    }
+
+    .analisis {
+      margin-top: 16px;
+      border: 1px solid var(--borde);
+      border-radius: 7px;
+      padding: 14px;
+      display: none;
+    }
+
+    .analisis.visible {
+      display: block;
+    }
+
+    .analisis strong {
+      color: var(--azul);
+    }
+
+    .modal-acciones {
+      padding: 14px 20px;
+      border-top: 1px solid var(--borde);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* ÉXITO */
+    #modalExito {
+      z-index: 200;
+    }
+
+    .modal-exito {
+      width: min(560px, 90vw);
+    }
+
+    .exito-cuerpo {
+      padding: 26px 28px 18px;
+    }
+
+    .exito-icono {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 14px;
+      border-radius: 50%;
+      background: var(--verde-claro);
+      color: var(--verde);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      font-weight: bold;
+    }
+
+    .exito-titulo {
+      margin: 0;
+      text-align: center;
+      color: var(--verde);
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .exito-texto {
+      margin: 8px 0 22px;
+      text-align: center;
+      color: var(--secundario);
+      font-size: 14px;
+    }
+
+    .exito-datos {
+      border-top: 1px solid var(--borde);
+      border-bottom: 1px solid var(--borde);
+      padding: 12px 0;
+    }
+
+    .exito-fila {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 7px 4px;
+      font-size: 14px;
+    }
+
+    .exito-fila span:first-child {
+      color: var(--secundario);
+    }
+
+    .exito-acciones {
+      padding: 0 28px 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .exito-acciones button {
+      min-width: 140px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header class="cabecera">
+      <h1>Administración de Stock</h1>
+      <div class="version">
+        Sprint A.3.1 · V<?= version ?>
+      </div>
+    </header>
+
+    <main class="contenido">
+
+      <section class="panel controles-deposito">
+        <div class="control-deposito" id="controlWarnes">
+          <strong>WARNES</strong>
+          Sin importaciones registradas
+        </div>
+
+        <div class="control-deposito" id="controlEscobar">
+          <strong>ESCOBAR</strong>
+          Sin importaciones registradas
+        </div>
+      </section>
+
+      <section class="panel filtros">
+        <div class="campo">
+          <label for="sku">SKU</label>
+          <input
+            id="sku"
+            type="text"
+            placeholder="Ej. KLILED..."
+          >
+        </div>
+
+        <div class="campo">
+          <label for="marca">Marca</label>
+          <select id="marca">
+            <option value="">Todas</option>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label for="deposito">Depósito</label>
+          <select id="deposito">
+            <option value="">Todos</option>
+            <option value="WARNES">WARNES</option>
+            <option value="ESCOBAR">ESCOBAR</option>
+          </select>
+        </div>
+
+        <button
+          class="primario"
+          onclick="buscar()"
+        >
+          Buscar
+        </button>
+      </section>
+
+      <section
+        class="panel"
+        style="
+          flex:1;
+          min-height:0;
+          display:flex;
+          flex-direction:column;
+        "
+      >
+        <div class="barra">
+          <div
+            id="estadoVista"
+            class="estado"
+          >
+            Inicializando…
+          </div>
+
+          <button
+            class="secundario"
+            onclick="abrirImportacion()"
+          >
+            📂 Importar stock
+          </button>
+        </div>
+
+        <div
+          id="tabla"
+          class="tabla-contenedor"
+        >
+          <div class="mensaje">
+            Cargando…
+          </div>
+        </div>
+
+        <div class="pie">
+          <span id="hojaFuente"></span>
+          <span id="duracion"></span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+
+  <!-- MODAL IMPORTACIÓN -->
+  <div
+    id="modalImportacion"
+    class="modal-fondo"
+  >
+    <div class="modal">
+      <div class="modal-titulo">
+        Importar stock
+      </div>
+
+      <div class="modal-contenido">
+        <div class="selector-archivo">
+          <input
+            id="archivoStock"
+            type="file"
+            accept=".xlsx,.xls"
+          >
+
+          <p>
+            Seleccioná el archivo de Warnes o Escobar.
+            El depósito se detectará automáticamente.
+          </p>
+
+          <button
+            id="btnAnalizar"
+            class="primario"
+            onclick="analizarArchivo()"
+          >
+            Analizar archivo
+          </button>
+        </div>
+
+        <div
+          id="analisisStock"
+          class="analisis"
+        ></div>
+      </div>
+
+      <div class="modal-acciones">
+        <button
+          class="secundario"
+          onclick="cerrarImportacion()"
+        >
+          Cancelar
+        </button>
+
+        <button
+          id="btnImportar"
+          class="primario"
+          onclick="confirmarImportacion()"
+          disabled
+        >
+          Importar
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL ÉXITO -->
+  <div
+    id="modalExito"
+    class="modal-fondo"
+  >
+    <div class="modal modal-exito">
+      <div class="modal-titulo">
+        Importación de stock
+      </div>
+
+      <div class="exito-cuerpo">
+        <div class="exito-icono">
+          ✓
+        </div>
+
+        <h2 class="exito-titulo">
+          IMPORTACIÓN COMPLETADA
+        </h2>
+
+        <p class="exito-texto">
+          El stock se importó correctamente.
+        </p>
+
+        <div class="exito-datos">
+          <div class="exito-fila">
+            <span>Depósito</span>
+            <strong id="exitoDeposito">-</strong>
+          </div>
+
+          <div class="exito-fila">
+            <span>Registros</span>
+            <strong id="exitoRegistros">-</strong>
+          </div>
+
+          <div class="exito-fila">
+            <span>Estado</span>
+            <strong class="ok">Sin errores</strong>
+          </div>
+
+          <div class="exito-fila">
+            <span>Fecha</span>
+            <strong id="exitoFecha">-</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="exito-acciones">
+        <button
+          class="primario"
+          onclick="cerrarExito()"
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    let registrosPendientes = null;
+    let nombreArchivoPendiente = '';
+    let depositoPendiente = '';
+
+    document.addEventListener(
+      'DOMContentLoaded',
+      inicializar
+    );
+
+    document.addEventListener(
+      'keydown',
+      function(evento) {
+        if (evento.key !== 'Escape') {
+          return;
+        }
+
+        if (
+          document
+            .getElementById('modalExito')
+            .classList.contains('visible')
+        ) {
+          cerrarExito();
+          return;
+        }
+
+        if (
+          document
+            .getElementById('modalImportacion')
+            .classList.contains('visible')
+        ) {
+          cerrarImportacion();
+        }
+      }
+    );
+
+
+    function inicializar() {
+      google.script.run
+        .withSuccessHandler(
+          cargarInicializacion
+        )
+        .withFailureHandler(
+          mostrarError
+        )
+        .asObtenerInicializacion();
+    }
+
+
+    function cargarInicializacion(datos) {
+      if (!datos || !datos.ok) {
+        mostrarError(
+          datos && datos.mensaje
+            ? datos.mensaje
+            : 'No fue posible inicializar.'
+        );
+        return;
+      }
+
+      cargarOpcionesMarca(
+        datos.marcas || []
+      );
+
+      mostrarControl(
+        'controlWarnes',
+        'WARNES',
+        datos.controles
+          ? datos.controles.WARNES
+          : null
+      );
+
+      mostrarControl(
+        'controlEscobar',
+        'ESCOBAR',
+        datos.controles
+          ? datos.controles.ESCOBAR
+          : null
+      );
+
+      document.getElementById(
+        'hojaFuente'
+      ).textContent =
+        datos.hoja
+          ? 'Fuente: ' + datos.hoja
+          : 'Fuente: STOCK';
+
+      buscar();
+    }
+
+
+    function cargarOpcionesMarca(
+      valores
+    ) {
+      const select =
+        document.getElementById(
+          'marca'
+        );
+
+      while (
+        select.options.length > 1
+      ) {
+        select.remove(1);
+      }
+
+      valores.forEach(
+        function(valor) {
+          const opcion =
+            document.createElement(
+              'option'
+            );
+
+          opcion.value = valor;
+          opcion.textContent = valor;
+
+          select.appendChild(
+            opcion
+          );
+        }
+      );
+    }
+
+
+    function mostrarControl(
+      id,
+      deposito,
+      control
+    ) {
+      const div =
+        document.getElementById(id);
+
+      if (!control) {
+        div.innerHTML =
+          '<strong>' +
+          deposito +
+          '</strong>' +
+          'Sin importaciones registradas';
+        return;
+      }
+
+      div.innerHTML =
+        '<strong>' +
+        deposito +
+        '</strong>' +
+        'Última importación: ' +
+        escaparHtml(control.fecha || '-') +
+        '<br>Archivo: ' +
+        escaparHtml(control.archivo || '-') +
+        '<br>Registros: ' +
+        escaparHtml(control.registros || '-');
+    }
+
+
+    function buscar() {
+      const filtros = {
+        sku:
+          document
+            .getElementById('sku')
+            .value,
+
+        marca:
+          document
+            .getElementById('marca')
+            .value,
+
+        deposito:
+          document
+            .getElementById('deposito')
+            .value
+      };
+
+      document.getElementById(
+        'estadoVista'
+      ).textContent =
+        'Buscando stock…';
+
+      google.script.run
+        .withSuccessHandler(
+          mostrarResultados
+        )
+        .withFailureHandler(
+          mostrarError
+        )
+        .asBuscarStock(filtros);
+    }
+
+
+    function mostrarResultados(
+      respuesta
+    ) {
+      if (
+        !respuesta ||
+        !respuesta.ok
+      ) {
+        mostrarError(
+          respuesta && respuesta.mensaje
+            ? respuesta.mensaje
+            : 'Error en la consulta.'
+        );
+        return;
+      }
+
+      const resultados =
+        respuesta.resultados || [];
+
+      document.getElementById(
+        'estadoVista'
+      ).textContent =
+        resultados.length +
+        ' registro(s) encontrados';
+
+      document.getElementById(
+        'duracion'
+      ).textContent =
+        respuesta.duracionMs +
+        ' ms';
+
+      document.getElementById(
+        'hojaFuente'
+      ).textContent =
+        'Fuente: ' +
+        (respuesta.hoja || 'STOCK');
+
+      if (!resultados.length) {
+        document.getElementById(
+          'tabla'
+        ).innerHTML =
+          '<div class="mensaje">' +
+          'No se encontraron registros.' +
+          '</div>';
+        return;
+      }
+
+      let html =
+        '<table>' +
+        '<thead>' +
+        '<tr>' +
+        '<th style="width:22%">SKU</th>' +
+        '<th style="width:24%">MARCA</th>' +
+        '<th style="width:18%">CÓDIGO VIEJO</th>' +
+        '<th style="width:14%">STOCK</th>' +
+        '<th style="width:12%">DEPÓSITO</th>' +
+        '<th style="width:10%">FECHA</th>' +
+        '</tr>' +
+        '</thead>' +
+        '<tbody>';
+
+      resultados.forEach(
+        function(item) {
+          html +=
+            '<tr>' +
+            '<td>' +
+              escaparHtml(item.sku) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.marca) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.codigoViejo) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.stock) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.deposito) +
+            '</td>' +
+            '<td>' +
+              escaparHtml(item.fechaImportacion) +
+            '</td>' +
+            '</tr>';
+        }
+      );
+
+      html +=
+        '</tbody>' +
+        '</table>';
+
+      document.getElementById(
+        'tabla'
+      ).innerHTML = html;
+    }
+
+
+    function abrirImportacion() {
+      registrosPendientes = null;
+      nombreArchivoPendiente = '';
+      depositoPendiente = '';
+
+      document.getElementById(
+        'archivoStock'
+      ).value = '';
+
+      const analisis =
+        document.getElementById(
+          'analisisStock'
+        );
+
+      analisis.innerHTML = '';
+      analisis.classList.remove(
+        'visible'
+      );
+
+      document.getElementById(
+        'btnImportar'
+      ).disabled = true;
+
+      document.getElementById(
+        'modalImportacion'
+      ).classList.add(
+        'visible'
+      );
+    }
+
+
+    function cerrarImportacion() {
+      document.getElementById(
+        'modalImportacion'
+      ).classList.remove(
+        'visible'
+      );
+    }
+
+
+    async function analizarArchivo() {
+      const archivo =
+        document
+          .getElementById(
+            'archivoStock'
+          )
+          .files[0];
+
+      if (!archivo) {
+        mostrarErrorImportacion(
+          'Seleccioná un archivo Excel.'
+        );
+        return;
+      }
+
+      const boton =
+        document.getElementById(
+          'btnAnalizar'
+        );
+
+      boton.disabled = true;
+      boton.textContent =
+        'Analizando…';
+
+      try {
+        const buffer =
+          await archivo.arrayBuffer();
+
+        const libro =
+          XLSX.read(
+            buffer,
+            {
+              type: 'array',
+              cellDates: true
+            }
+          );
+
+        const nombreHoja =
+          libro.SheetNames.includes(
+            'Stock'
+          )
+            ? 'Stock'
+            : libro.SheetNames[0];
+
+        if (!nombreHoja) {
+          throw new Error(
+            'El archivo no contiene hojas.'
+          );
+        }
+
+        const hoja =
+          libro.Sheets[
+            nombreHoja
+          ];
+
+        const filas =
+          XLSX.utils.sheet_to_json(
+            hoja,
+            {
+              header: 1,
+              defval: '',
+              raw: false
+            }
+          );
+
+        if (filas.length < 2) {
+          throw new Error(
+            'El archivo no contiene datos.'
+          );
+        }
+
+        const encabezados =
+          filas[0].map(
+            normalizarEncabezado
+          );
+
+        const colMarca =
+          buscarColumna(
+            encabezados,
+            ['MARCA']
+          );
+
+        const colCodigoViejo =
+          buscarColumna(
+            encabezados,
+            [
+              'CODIGO VIEJO',
+              'CODIGO ANTIGUO'
+            ]
+          );
+
+        const colSku =
+          buscarColumna(
+            encabezados,
+            [
+              'CODIGO UNICO',
+              'SKU'
+            ]
+          );
+
+        const colCantidad =
+          buscarColumna(
+            encabezados,
+            [
+              'CANTIDAD',
+              'STOCK'
+            ]
+          );
+
+        const colDeposito =
+          buscarColumna(
+            encabezados,
+            [
+              'DEPOSITO'
+            ]
+          );
+
+        const registros =
+          filas
+            .slice(1)
+            .filter(function(fila) {
+              return String(
+                fila[colSku] || ''
+              ).trim() !== '';
+            })
+            .map(function(fila) {
+              return [
+                String(
+                  fila[colSku] || ''
+                ).trim(),
+
+                String(
+                  fila[colMarca] || ''
+                ).trim(),
+
+                String(
+                  fila[colCodigoViejo] || ''
+                ).trim(),
+
+                fila[colCantidad],
+
+                normalizarDeposito(
+                  fila[colDeposito]
+                )
+              ];
+            });
+
+        if (!registros.length) {
+          throw new Error(
+            'No se encontraron SKU para importar.'
+          );
+        }
+
+        const depositos =
+          [
+            ...new Set(
+              registros
+                .map(
+                  function(fila) {
+                    return fila[4];
+                  }
+                )
+                .filter(Boolean)
+            )
+          ];
+
+        if (
+          depositos.length !== 1
+        ) {
+          throw new Error(
+            depositos.length === 0
+              ? 'No se encontró el depósito.'
+              : 'El archivo contiene más de un depósito: ' +
+                depositos.join(', ')
+          );
+        }
+
+        const deposito =
+          depositos[0];
+
+        if (
+          deposito !== 'WARNES' &&
+          deposito !== 'ESCOBAR'
+        ) {
+          throw new Error(
+            'Depósito no reconocido: ' +
+            deposito
+          );
+        }
+
+        const sinDeposito =
+          registros.filter(
+            function(fila) {
+              return !fila[4];
+            }
+          ).length;
+
+        if (sinDeposito > 0) {
+          throw new Error(
+            'Se encontraron ' +
+            sinDeposito +
+            ' registros sin depósito.'
+          );
+        }
+
+        registrosPendientes =
+          registros;
+
+        nombreArchivoPendiente =
+          archivo.name;
+
+        depositoPendiente =
+          deposito;
+
+        const analisis =
+          document.getElementById(
+            'analisisStock'
+          );
+
+        analisis.innerHTML =
+          '<strong>Archivo listo para importar</strong>' +
+          '<br>Depósito: ' +
+          escaparHtml(deposito) +
+          '<br>Filas leídas: ' +
+          formatearNumero(
+            registros.length
+          ) +
+          '<br>Archivo: ' +
+          escaparHtml(
+            archivo.name
+          );
+
+        analisis.classList.add(
+          'visible'
+        );
+
+        document.getElementById(
+          'btnImportar'
+        ).disabled = false;
+
+      } catch (error) {
+        mostrarErrorImportacion(
+          error
+        );
+
+      } finally {
+        boton.disabled = false;
+        boton.textContent =
+          'Analizar archivo';
+      }
+    }
+
+
+    function confirmarImportacion() {
+      if (
+        !registrosPendientes ||
+        !registrosPendientes.length
+      ) {
+        return;
+      }
+
+      const boton =
+        document.getElementById(
+          'btnImportar'
+        );
+
+      boton.disabled = true;
+      boton.textContent =
+        'Importando…';
+
+      google.script.run
+        .withSuccessHandler(
+          function(resultado) {
+            boton.disabled = false;
+            boton.textContent =
+              'Importar';
+
+            cerrarImportacion();
+            mostrarExito(
+              resultado
+            );
+          }
+        )
+        .withFailureHandler(
+          function(error) {
+            boton.disabled = false;
+            boton.textContent =
+              'Importar';
+
+            mostrarErrorImportacion(
+              error
+            );
+          }
+        )
+        .guardarStockBam(
+          registrosPendientes,
+          nombreArchivoPendiente
+        );
+    }
+
+
+    function mostrarExito(
+      resultado
+    ) {
+      document.getElementById(
+        'exitoDeposito'
+      ).textContent =
+        resultado &&
+        resultado.deposito
+          ? resultado.deposito
+          : depositoPendiente;
+
+      document.getElementById(
+        'exitoRegistros'
+      ).textContent =
+        formatearNumero(
+          resultado &&
+          resultado.registros !== undefined
+            ? resultado.registros
+            : registrosPendientes.length
+        );
+
+      document.getElementById(
+        'exitoFecha'
+      ).textContent =
+        resultado &&
+        resultado.fecha
+          ? resultado.fecha
+          : formatearFechaActual();
+
+      document.getElementById(
+        'modalExito'
+      ).classList.add(
+        'visible'
+      );
+    }
+
+
+    function cerrarExito() {
+      document.getElementById(
+        'modalExito'
+      ).classList.remove(
+        'visible'
+      );
+
+      registrosPendientes = null;
+      nombreArchivoPendiente = '';
+      depositoPendiente = '';
+
+      inicializar();
+    }
+
+
+    function normalizarEncabezado(
+      valor
+    ) {
+      return String(valor || '')
+        .trim()
+        .normalize('NFD')
+        .replace(
+          /[\u0300-\u036f]/g,
+          ''
+        )
+        .toUpperCase()
+        .replace(/\s+/g, ' ');
+    }
+
+
+    function normalizarDeposito(
+      valor
+    ) {
+      const deposito =
+        normalizarEncabezado(
+          valor
+        );
+
+      if (
+        deposito.includes(
+          'WARNES'
+        )
+      ) {
+        return 'WARNES';
+      }
+
+      if (
+        deposito.includes(
+          'ESCOBAR'
+        )
+      ) {
+        return 'ESCOBAR';
+      }
+
+      return deposito;
+    }
+
+
+    function buscarColumna(
+      encabezados,
+      alternativas
+    ) {
+      const candidatas =
+        alternativas.map(
+          normalizarEncabezado
+        );
+
+      for (
+        let i = 0;
+        i < encabezados.length;
+        i++
+      ) {
+        if (
+          candidatas.includes(
+            encabezados[i]
+          )
+        ) {
+          return i;
+        }
+      }
+
+      throw new Error(
+        'No se encontró la columna: ' +
+        alternativas.join(' / ')
+      );
+    }
+
+
+    function mostrarErrorImportacion(
+      error
+    ) {
+      const mensaje =
+        error && error.message
+          ? error.message
+          : String(
+              error ||
+              'Error desconocido'
+            );
+
+      const analisis =
+        document.getElementById(
+          'analisisStock'
+        );
+
+      analisis.innerHTML =
+        '<span class="error">' +
+        escaparHtml(mensaje) +
+        '</span>';
+
+      analisis.classList.add(
+        'visible'
+      );
+
+      document.getElementById(
+        'btnImportar'
+      ).disabled = true;
+    }
+
+
+    function mostrarError(error) {
+      const mensaje =
+        error && error.message
+          ? error.message
+          : String(
+              error ||
+              'Error desconocido'
+            );
+
+      document.getElementById(
+        'estadoVista'
+      ).textContent =
+        'Se produjo un error';
+
+      document.getElementById(
+        'tabla'
+      ).innerHTML =
+        '<div class="mensaje error">' +
+        escaparHtml(mensaje) +
+        '</div>';
+    }
+
+
+    function formatearNumero(
+      valor
+    ) {
+      const numero =
+        Number(valor);
+
+      if (
+        !Number.isFinite(numero)
+      ) {
+        return String(valor);
+      }
+
+      return numero.toLocaleString(
+        'es-AR'
+      );
+    }
+
+
+    function formatearFechaActual() {
+      const ahora =
+        new Date();
+
+      return (
+        ahora.toLocaleDateString(
+          'es-AR'
+        ) +
+        ' ' +
+        ahora.toLocaleTimeString(
+          'es-AR',
+          {
+            hour: '2-digit',
+            minute: '2-digit'
+          }
+        )
+      );
+    }
+
+
+    function escaparHtml(
+      valor
+    ) {
+      return String(
+        valor === null ||
+        valor === undefined
+          ? ''
+          : valor
+      )
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

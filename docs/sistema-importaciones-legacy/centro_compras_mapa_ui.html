@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <style>
+    :root {
+      --azul: #1f4e78;
+      --azul2: #2f75b5;
+      --fondo: #f4f7fb;
+      --borde: #d9e2ec;
+      --texto: #1f2937;
+      --muted: #64748b;
+      --verde: #2e7d32;
+      --amarillo: #b7791f;
+      --naranja: #c05621;
+      --rojo: #b91c1c;
+      --gris: #6b7280;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--fondo);
+      color: var(--texto);
+    }
+
+    .app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: linear-gradient(135deg, #173a5e, #2f75b5);
+      color: white;
+      padding: 13px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .title {
+      font-size: 21px;
+      font-weight: bold;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    button {
+      border: 0;
+      border-radius: 7px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .primary {
+      background: white;
+      color: var(--azul);
+    }
+
+    .secondary {
+      background: rgba(255,255,255,.16);
+      color: white;
+      border: 1px solid rgba(255,255,255,.3);
+    }
+
+    .filters {
+      background: white;
+      border-bottom: 1px solid var(--borde);
+      padding: 10px 14px;
+      display: grid;
+      grid-template-columns: 2fr 1fr 110px auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--borde);
+      border-radius: 7px;
+      padding: 9px 10px;
+      background: white;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .check input {
+      width: auto;
+    }
+
+    .content {
+      flex: 1;
+      min-height: 0;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 9px;
+      padding: 11px;
+      min-height: 77px;
+    }
+
+    .card .label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .card .value {
+      margin-top: 7px;
+      font-size: 22px;
+      font-weight: bold;
+      color: var(--azul);
+    }
+
+    .card.ROJO { border-top: 5px solid var(--rojo); }
+    .card.NARANJA { border-top: 5px solid var(--naranja); }
+    .card.AMARILLO { border-top: 5px solid var(--amarillo); }
+    .card.GRIS { border-top: 5px solid var(--gris); }
+
+    .panel {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 46% 54%;
+      gap: 10px;
+    }
+
+    .table-wrap {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      overflow: auto;
+      min-height: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      min-width: 1080px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: var(--azul);
+      color: white;
+      padding: 9px 8px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    td {
+      border-bottom: 1px solid #edf1f5;
+      padding: 8px;
+      vertical-align: middle;
+    }
+
+    tbody tr:hover {
+      background: #edf5fb;
+    }
+
+    tbody tr.selected {
+      background: #dbeafe;
+    }
+
+    .clickable {
+      color: var(--azul);
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .action {
+      display: inline-block;
+      color: white;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 10px;
+      min-width: 92px;
+      text-align: center;
+    }
+
+    .action.ROJO { background: var(--rojo); }
+    .action.NARANJA { background: var(--naranja); }
+    .action.AMARILLO { background: var(--amarillo); }
+    .action.VERDE { background: var(--verde); }
+    .action.GRIS { background: var(--gris); }
+
+    .num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .loading,
+    .empty,
+    .error {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      padding: 30px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .error {
+      color: var(--rojo);
+      background: #fff5f5;
+    }
+
+    .detail-title {
+      background: white;
+      border: 1px solid var(--borde);
+      border-radius: 10px;
+      padding: 11px 13px;
+      font-weight: bold;
+      color: var(--azul);
+    }
+
+    .detail {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .detail .table-wrap {
+      flex: 1;
+    }
+
+    .footer {
+      font-size: 10px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    @media (max-width: 1100px) {
+      .cards {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .panel {
+        grid-template-columns: 1fr;
+      }
+
+      .filters {
+        grid-template-columns: 2fr 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div class="title">
+        Centro de Compras por Marca
+      </div>
+
+      <div class="spacer"></div>
+
+      <button
+        class="primary"
+        onclick="cargarMarcas()"
+      >
+        Actualizar
+      </button>
+
+      <button
+        class="secondary"
+        onclick="google.script.host.close()"
+      >
+        Cerrar
+      </button>
+    </div>
+
+    <div class="filters">
+      <input
+        id="texto"
+        placeholder="Buscar marca, SKU, descripción o proveedor..."
+        onkeydown="if(event.key==='Enter'){cargarMarcas();}"
+      >
+
+      <select id="accion">
+        <option value="">Todas las acciones</option>
+        <option value="COMPRAR">Comprar</option>
+        <option value="PLANIFICAR">Planificar</option>
+        <option value="REVISAR">Revisar</option>
+        <option value="REVISAR DATOS">Revisar datos</option>
+        <option value="SIN ACCIÓN">Sin acción</option>
+      </select>
+
+      <input
+        id="scoreMinimo"
+        type="number"
+        min="0"
+        max="100"
+        value="0"
+        title="Score mínimo"
+      >
+
+      <label class="check">
+        <input
+          id="soloCompra"
+          type="checkbox"
+        >
+        Solo con compra
+      </label>
+
+      <button
+        onclick="cargarMarcas()"
+        style="background:#1f4e78;color:white"
+      >
+        Aplicar
+      </button>
+    </div>
+
+    <div
+      class="content"
+      id="contenido"
+    >
+      <div class="loading">
+        Consolidando compras por marca...
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let marcaSeleccionada = '';
+
+    document.addEventListener(
+      'DOMContentLoaded',
+      cargarMarcas
+    );
+
+
+    function filtros() {
+      return {
+        texto:
+          value('texto'),
+
+        accion:
+          value('accion'),
+
+        scoreMinimo:
+          value('scoreMinimo'),
+
+        soloConCompra:
+          document
+            .getElementById(
+              'soloCompra'
+            )
+            .checked
+      };
+    }
+
+
+    function cargarMarcas() {
+      document.getElementById(
+        'contenido'
+      ).innerHTML =
+        '<div class="loading">Consolidando compras por marca...</div>';
+
+      google.script.run
+        .withSuccessHandler(
+          renderMarcas
+        )
+        .withFailureHandler(
+          mostrarError
+        )
+        .obtenerCentroComprasPorMarca(
+          filtros()
+        );
+    }
+
+
+    function renderMarcas(data) {
+      const r =
+        data.resumenGeneral;
+
+      document.getElementById(
+        'contenido'
+      ).innerHTML = `
+        <div class="cards">
+          ${card('Marcas', r.marcasTotal, '')}
+          ${card('Marcas comprar', r.marcasComprar, 'ROJO')}
+          ${card('Marcas planificar', r.marcasPlanificar, 'NARANJA')}
+          ${card('Marcas revisar', r.marcasRevisar, 'AMARILLO')}
+          ${card('SKU comprar', r.skuComprar, 'ROJO')}
+          ${card('Cantidad sugerida', numero(r.cantidadSugerida, 0), '')}
+          ${card('Compra estimada', 'USD ' + numero(r.compraEstimadaUsd, 2), '')}
+        </div>
+
+        <div class="panel">
+          <div class="table-wrap">
+            ${renderTablaMarcas(data.marcas)}
+          </div>
+
+          <div class="detail" id="detalle">
+            <div class="empty">
+              Seleccioná una marca para ver sus SKU.
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          Actualizado ${escapeHtml(data.generadoEn)}
+          · V${escapeHtml(data.version)}
+        </div>
+      `;
+
+      if (
+        marcaSeleccionada &&
+        data.marcas.some(
+          m =>
+            m.marca ===
+            marcaSeleccionada
+        )
+      ) {
+        cargarDetalle(
+          marcaSeleccionada
+        );
+      }
+    }
+
+
+    function renderTablaMarcas(marcas) {
+      if (!marcas || !marcas.length) {
+        return `
+          <div class="empty">
+            No hay marcas que cumplan los filtros.
+          </div>
+        `;
+      }
+
+      return `
+        <table>
+          <thead>
+            <tr>
+              <th>Acción</th>
+              <th>Marca</th>
+              <th>SKU</th>
+              <th>Comprar</th>
+              <th>Planificar</th>
+              <th>Score prom.</th>
+              <th>Score máx.</th>
+              <th>Cobertura</th>
+              <th>Cobertura proy.</th>
+              <th>Stock</th>
+              <th>Pendiente</th>
+              <th>Cant. sugerida</th>
+              <th>Compra USD</th>
+              <th>Proveedores</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${marcas.map(m => `
+              <tr
+                id="marca-${cssId(m.marca)}"
+                onclick='cargarDetalle(${JSON.stringify(m.marca)})'
+              >
+                <td>
+                  <span class="action ${escapeHtml(m.nivel)}">
+                    ${escapeHtml(m.accion)}
+                  </span>
+                </td>
+
+                <td class="clickable">
+                  ${escapeHtml(m.marca)}
+                </td>
+
+                <td class="num">${numero(m.skuTotal, 0)}</td>
+                <td class="num">${numero(m.skuComprar, 0)}</td>
+                <td class="num">${numero(m.skuPlanificar, 0)}</td>
+                <td class="num">${numero(m.scorePromedio, 1)}</td>
+                <td class="num">${numero(m.scoreMaximo, 0)}</td>
+
+                <td class="num">
+                  ${
+                    m.coberturaPonderada === null
+                      ? '—'
+                      : numero(m.coberturaPonderada, 2)
+                  }
+                </td>
+
+                <td class="num">
+                  ${
+                    m.coberturaProyectada === null
+                      ? '—'
+                      : numero(m.coberturaProyectada, 2)
+                  }
+                </td>
+
+                <td class="num">${numero(m.stockTotal, 0)}</td>
+                <td class="num">${numero(m.pendienteTotal, 0)}</td>
+                <td class="num">${numero(m.cantidadSugerida, 0)}</td>
+                <td class="num">${numero(m.compraEstimadaUsd, 2)}</td>
+                <td>${escapeHtml(m.proveedores.join(', '))}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+
+    function cargarDetalle(marca) {
+      marcaSeleccionada =
+        marca;
+
+      document
+        .querySelectorAll(
+          'tbody tr'
+        )
+        .forEach(
+          tr =>
+            tr.classList.remove(
+              'selected'
+            )
+        );
+
+      const fila =
+        document.getElementById(
+          'marca-' +
+          cssId(marca)
+        );
+
+      if (fila) {
+        fila.classList.add(
+          'selected'
+        );
+      }
+
+      document.getElementById(
+        'detalle'
+      ).innerHTML =
+        '<div class="loading">Cargando SKU de ' +
+        escapeHtml(marca) +
+        '...</div>';
+
+      google.script.run
+        .withSuccessHandler(
+          renderDetalle
+        )
+        .withFailureHandler(
+          mostrarErrorDetalle
+        )
+        .obtenerDetalleCentroMarca(
+          marca,
+          filtros()
+        );
+    }
+
+
+    function renderDetalle(data) {
+      const r =
+        data.resumen;
+
+      document.getElementById(
+        'detalle'
+      ).innerHTML = `
+        <div class="detail-title">
+          ${escapeHtml(data.marca)}
+          · ${numero(r.skuTotal, 0)} SKU
+          · ${numero(r.comprar, 0)} comprar
+          · ${numero(r.planificar, 0)} planificar
+          · ${numero(r.cantidadSugerida, 0)} unidades sugeridas
+        </div>
+
+        <div class="table-wrap">
+          ${renderTablaDetalle(data.filas)}
+        </div>
+      `;
+    }
+
+
+    function renderTablaDetalle(filas) {
+      if (!filas || !filas.length) {
+        return `
+          <div class="empty">
+            La marca no tiene SKU que cumplan los filtros.
+          </div>
+        `;
+      }
+
+      return `
+        <table>
+          <thead>
+            <tr>
+              <th>Acción</th>
+              <th>Score</th>
+              <th>SKU</th>
+              <th>Descripción</th>
+              <th>Proveedor</th>
+              <th>Stock</th>
+              <th>Pendiente</th>
+              <th>Consumo</th>
+              <th>Cobertura</th>
+              <th>Cobertura proy.</th>
+              <th>Cant. sugerida</th>
+              <th>Compra USD</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${filas.map(f => `
+              <tr>
+                <td>
+                  <span class="action ${escapeHtml(f.nivel)}">
+                    ${escapeHtml(f.accion)}
+                  </span>
+                </td>
+
+                <td class="num">${numero(f.score, 0)}</td>
+
+                <td
+                  class="clickable"
+                  onclick='abrirFicha(${JSON.stringify(f.sku)})'
+                  title="Abrir Ficha SKU"
+                >
+                  ${escapeHtml(f.sku)}
+                </td>
+
+                <td>${escapeHtml(f.descripcion || '')}</td>
+                <td>${escapeHtml(f.proveedor || '')}</td>
+                <td class="num">${numero(f.stock, 2)}</td>
+                <td class="num">${numero(f.pendiente, 2)}</td>
+                <td class="num">${numero(f.consumoMensual, 2)}</td>
+
+                <td class="num">
+                  ${
+                    f.coberturaActual === null
+                      ? '—'
+                      : numero(f.coberturaActual, 2)
+                  }
+                </td>
+
+                <td class="num">
+                  ${
+                    f.coberturaProyectada === null
+                      ? '—'
+                      : numero(f.coberturaProyectada, 2)
+                  }
+                </td>
+
+                <td class="num">${numero(f.cantidadSugerida, 0)}</td>
+
+                <td class="num">
+                  ${
+                    f.compraEstimadaUsd === null
+                      ? '—'
+                      : numero(f.compraEstimadaUsd, 2)
+                  }
+                </td>
+
+                <td>${escapeHtml(f.motivo || '')}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+
+    function abrirFicha(sku) {
+      google.script.run
+        .withFailureHandler(
+          function(error) {
+            alert(
+              error &&
+              error.message
+                ? error.message
+                : String(error)
+            );
+          }
+        )
+        .abrirFichaSkuDesdeMarca(
+          sku
+        );
+    }
+
+
+    function card(
+      label,
+      value,
+      clase
+    ) {
+      return `
+        <div class="card ${clase || ''}">
+          <div class="label">${escapeHtml(label)}</div>
+          <div class="value">${escapeHtml(String(value))}</div>
+        </div>
+      `;
+    }
+
+
+    function mostrarError(error) {
+      document.getElementById(
+        'contenido'
+      ).innerHTML =
+        '<div class="error">' +
+        escapeHtml(
+          error &&
+          error.message
+            ? error.message
+            : String(error)
+        ) +
+        '</div>';
+    }
+
+
+    function mostrarErrorDetalle(error) {
+      document.getElementById(
+        'detalle'
+      ).innerHTML =
+        '<div class="error">' +
+        escapeHtml(
+          error &&
+          error.message
+            ? error.message
+            : String(error)
+        ) +
+        '</div>';
+    }
+
+
+    function value(id) {
+      return document
+        .getElementById(id)
+        .value;
+    }
+
+
+    function numero(
+      valor,
+      decimales
+    ) {
+      return Number(valor || 0)
+        .toLocaleString(
+          'es-AR',
+          {
+            minimumFractionDigits:
+              decimales,
+            maximumFractionDigits:
+              decimales
+          }
+        );
+    }
+
+
+    function cssId(valor) {
+      return String(valor || '')
+        .replace(
+          /[^a-zA-Z0-9_-]/g,
+          '_'
+        );
+    }
+
+
+    function escapeHtml(valor) {
+      return String(
+        valor === null ||
+        valor === undefined
+          ? ''
+          : valor
+      )
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

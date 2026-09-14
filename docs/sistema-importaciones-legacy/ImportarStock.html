@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <script
+    src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js">
+  </script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      color: #222;
+    }
+
+    h2 {
+      margin-top: 0;
+      color: #1f4e78;
+    }
+
+    input {
+      width: 100%;
+      margin: 15px 0;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    #btnImportar {
+      background: #1f4e78;
+      color: white;
+    }
+
+    #btnCerrar {
+      margin-left: 8px;
+      background: #dddddd;
+    }
+
+    #mensaje {
+      margin-top: 18px;
+      padding: 10px;
+      display: none;
+      white-space: pre-line;
+    }
+
+    .procesando {
+      display: block !important;
+      background: #fff2cc;
+      color: #7f6000;
+    }
+
+    .correcto {
+      display: block !important;
+      background: #d9ead3;
+      color: #274e13;
+    }
+
+    .error {
+      display: block !important;
+      background: #f4cccc;
+      color: #9c0006;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>Importar stock BAM</h2>
+
+  <div>
+    Seleccioná el archivo diario de stock descargado desde BAM.
+    El depósito se toma automáticamente de la columna Deposito. Se aceptan tanto el formato BAM anterior como el nuevo formato de Warnes.
+  </div>
+
+  <input
+    type="file"
+    id="archivo"
+    accept=".xlsx,.xls"
+  >
+
+  <button
+    id="btnImportar"
+    onclick="leerArchivo()"
+  >
+    Importar
+  </button>
+
+  <button
+    id="btnCerrar"
+    onclick="google.script.host.close()"
+  >
+    Cerrar
+  </button>
+
+  <div id="mensaje"></div>
+
+  <script>
+    function leerArchivo() {
+      const input =
+        document.getElementById('archivo');
+
+      const mensaje =
+        document.getElementById('mensaje');
+
+      const boton =
+        document.getElementById('btnImportar');
+
+      if (!input.files.length) {
+        mostrarError(
+          'Seleccioná un archivo Excel.'
+        );
+        return;
+      }
+
+      const archivo = input.files[0];
+
+      boton.disabled = true;
+
+      mensaje.className = 'procesando';
+      mensaje.textContent =
+        'Leyendo y procesando el archivo...';
+
+      const lector = new FileReader();
+
+      lector.onload = function(evento) {
+        try {
+          const datos = new Uint8Array(
+            evento.target.result
+          );
+
+          const libro = XLSX.read(
+            datos,
+            {
+              type: 'array',
+              cellDates: true
+            }
+          );
+
+          const nombreHoja =
+            libro.SheetNames.includes('Stock')
+              ? 'Stock'
+              : libro.SheetNames[0];
+
+          if (!nombreHoja) {
+            throw new Error(
+              'El archivo no contiene hojas.'
+            );
+          }
+
+          const hoja =
+            libro.Sheets[nombreHoja];
+
+          /*
+           * raw:false mantiene los códigos como texto
+           * según su visualización en Excel.
+           */
+          const filas =
+            XLSX.utils.sheet_to_json(
+              hoja,
+              {
+                header: 1,
+                defval: '',
+                raw: false
+              }
+            );
+
+          if (filas.length < 2) {
+            throw new Error(
+              'El archivo no contiene datos.'
+            );
+          }
+
+          const encabezados =
+            filas[0].map(normalizarEncabezado);
+
+          const colMarca =
+            buscarColumnaOpcional(
+              encabezados,
+              ['MARCA']
+            );
+
+          const colCodigoViejo =
+            buscarColumnaOpcional(
+              encabezados,
+              [
+                'CODIGO VIEJO',
+                'CODIGO ANTIGUO'
+              ]
+            );
+
+          const colSku =
+            buscarColumna(
+              encabezados,
+              [
+                'CODIGO UNICO',
+                'SKU',
+                'ETIQUETAS DE FILA'
+              ]
+            );
+
+          const colCantidad =
+            buscarColumna(
+              encabezados,
+              [
+                'CANTIDAD',
+                'STOCK',
+                'SUMA DE CANTIDAD'
+              ]
+            );
+
+          /*
+           * El depósito se identifica por encabezado.
+           * Esto permite que esté en la columna D del nuevo
+           * formato de Warnes o en la posición del formato anterior.
+           */
+          const colDeposito =
+            buscarColumna(
+              encabezados,
+              [
+                'DEPOSITO',
+                'DEPÓSITO'
+              ]
+            );
+
+          const registros = filas
+            .slice(1)
+            .filter(fila => {
+              return String(
+                fila[colSku] || ''
+              ).trim() !== '';
+            })
+            .map(fila => {
+              const deposito =
+                normalizarDeposito(
+                  fila[colDeposito]
+                );
+
+              return [
+                String(
+                  fila[colSku] || ''
+                ).trim(),
+
+                colMarca >= 0
+                  ? String(
+                      fila[colMarca] || ''
+                    ).trim()
+                  : '',
+
+                colCodigoViejo >= 0
+                  ? String(
+                      fila[colCodigoViejo] || ''
+                    ).trim()
+                  : '',
+
+                convertirNumeroExcel(
+                  fila[colCantidad]
+                ),
+
+                deposito
+              ];
+            });
+
+          if (!registros.length) {
+            throw new Error(
+              'No se encontraron SKU para importar.'
+            );
+          }
+
+          /*
+           * Valida que todas las filas tengan depósito.
+           */
+          const sinDeposito = registros.filter(
+            fila => !fila[4]
+          ).length;
+
+          if (sinDeposito > 0) {
+            throw new Error(
+              'Se encontraron ' +
+              sinDeposito +
+              ' registros sin depósito en la columna Deposito.'
+            );
+          }
+
+          /*
+           * Detecta los depósitos presentes en el archivo.
+           */
+          const depositosEncontrados = [
+            ...new Set(
+              registros
+                .map(fila => fila[4])
+                .filter(Boolean)
+            )
+          ];
+
+          /*
+           * Solo se aceptan WARNES y ESCOBAR.
+           */
+          const depositosInvalidos =
+            depositosEncontrados.filter(
+              deposito =>
+                deposito !== 'WARNES' &&
+                deposito !== 'ESCOBAR'
+            );
+
+          if (depositosInvalidos.length > 0) {
+            throw new Error(
+              'Se encontraron depósitos no reconocidos en la columna Deposito: ' +
+              depositosInvalidos.join(', ')
+            );
+          }
+
+          /*
+           * Cada archivo debe corresponder a un solo depósito.
+           */
+          if (depositosEncontrados.length > 1) {
+            throw new Error(
+              'El archivo contiene más de un depósito en la columna Deposito: ' +
+              depositosEncontrados.join(', ')
+            );
+          }
+
+          const depositoArchivo =
+            depositosEncontrados[0];
+
+          mensaje.textContent =
+            'Guardando ' +
+            registros.length +
+            ' registros de ' +
+            depositoArchivo +
+            ' en STOCK...';
+
+          google.script.run
+            .withSuccessHandler(
+              importacionCorrecta
+            )
+            .withFailureHandler(
+              importacionFallida
+            )
+            .guardarStockBam(
+              registros,
+              archivo.name
+            );
+
+        } catch (error) {
+          importacionFallida(error);
+        }
+      };
+
+      lector.onerror = function() {
+        importacionFallida(
+          new Error(
+            'No se pudo leer el archivo.'
+          )
+        );
+      };
+
+      lector.readAsArrayBuffer(archivo);
+    }
+
+
+    /**
+     * Normaliza encabezados del Excel.
+     */
+    function normalizarEncabezado(valor) {
+      return String(valor || '')
+        .trim()
+        .normalize('NFD')
+        .replace(
+          /[\u0300-\u036f]/g,
+          ''
+        )
+        .toUpperCase()
+        .replace(/\s+/g, ' ');
+    }
+
+
+    /**
+     * Normaliza el depósito.
+     */
+    function normalizarDeposito(valor) {
+      const deposito = String(
+        valor || ''
+      )
+        .trim()
+        .normalize('NFD')
+        .replace(
+          /[\u0300-\u036f]/g,
+          ''
+        )
+        .toUpperCase()
+        .replace(/\s+/g, ' ');
+
+      if (
+        deposito === 'WARNES' ||
+        deposito.includes('WARNES')
+      ) {
+        return 'WARNES';
+      }
+
+      if (
+        deposito === 'ESCOBAR' ||
+        deposito.includes('ESCOBAR')
+      ) {
+        return 'ESCOBAR';
+      }
+
+      return deposito;
+    }
+
+
+
+    /**
+     * Convierte números provenientes de Excel con formato regional:
+     * punto = separador de miles
+     * coma = separador decimal
+     *
+     * Ejemplos:
+     * 2.917 -> 2917
+     * 1.234.567 -> 1234567
+     * 25,5 -> 25.5
+     * 2.917,50 -> 2917.5
+     */
+    function convertirNumeroExcel(valor) {
+      if (
+        valor === null ||
+        valor === undefined ||
+        valor === ''
+      ) {
+        return 0;
+      }
+
+      let texto = String(valor)
+        .trim()
+        .replace(/\u00A0/g, '')
+        .replace(/\s/g, '')
+        .replace(/[^0-9,.\-]/g, '');
+
+      if (!texto || texto === '-') {
+        return 0;
+      }
+
+      texto = texto.replace(/\./g, '');
+
+      const ultimaComa =
+        texto.lastIndexOf(',');
+
+      if (ultimaComa >= 0) {
+        texto =
+          texto.substring(0, ultimaComa)
+            .replace(/,/g, '') +
+          '.' +
+          texto.substring(ultimaComa + 1)
+            .replace(/,/g, '');
+      }
+
+      const numero = Number(texto);
+
+      if (!Number.isFinite(numero)) {
+        throw new Error(
+          'No se pudo interpretar el valor numérico: ' +
+          valor
+        );
+      }
+
+      return numero;
+    }
+
+
+    /**
+     * Busca una columna opcional por encabezado.
+     * Si no existe devuelve -1.
+     */
+    function buscarColumnaOpcional(
+      encabezados,
+      alternativas
+    ) {
+      const alternativasNormalizadas =
+        alternativas.map(
+          normalizarEncabezado
+        );
+
+      for (
+        let i = 0;
+        i < encabezados.length;
+        i++
+      ) {
+        if (
+          alternativasNormalizadas.includes(
+            encabezados[i]
+          )
+        ) {
+          return i;
+        }
+      }
+
+      return -1;
+    }
+
+
+    /**
+     * Busca una columna por encabezado.
+     */
+    function buscarColumna(
+      encabezados,
+      alternativas
+    ) {
+      const alternativasNormalizadas =
+        alternativas.map(
+          normalizarEncabezado
+        );
+
+      for (
+        let i = 0;
+        i < encabezados.length;
+        i++
+      ) {
+        if (
+          alternativasNormalizadas.includes(
+            encabezados[i]
+          )
+        ) {
+          return i;
+        }
+      }
+
+      throw new Error(
+        'No se encontró la columna: ' +
+        alternativas.join(' / ')
+      );
+    }
+
+
+    /**
+     * Resultado correcto.
+     */
+    function importacionCorrecta(resultado) {
+      const mensaje =
+        document.getElementById('mensaje');
+
+      mensaje.className = 'correcto';
+
+      mensaje.textContent =
+        'Stock importado correctamente.\n\n' +
+        'Depósito: ' +
+        (
+          resultado.deposito ||
+          'No informado'
+        ) +
+        '\nRegistros: ' +
+        resultado.registros +
+        '\nArchivo: ' +
+        resultado.archivo +
+        '\nFecha: ' +
+        resultado.fecha;
+
+      document.getElementById(
+        'btnImportar'
+      ).disabled = false;
+    }
+
+
+    /**
+     * Resultado con error.
+     */
+    function importacionFallida(error) {
+      mostrarError(
+        error && error.message
+          ? error.message
+          : String(error)
+      );
+
+      document.getElementById(
+        'btnImportar'
+      ).disabled = false;
+    }
+
+
+    /**
+     * Muestra errores.
+     */
+    function mostrarError(texto) {
+      const mensaje =
+        document.getElementById('mensaje');
+
+      mensaje.className = 'error';
+
+      mensaje.textContent =
+        'No se pudo importar el stock.\n\n' +
+        texto;
+    }
+  </script>
+
+</body>
+</html>
