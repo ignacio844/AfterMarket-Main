@@ -68,7 +68,7 @@ const TIME_ZONE = "America/Argentina/Buenos_Aires";
 const EMPTY_CONFIG = { compra: "NO", origen: "SIN CONFIGURAR", objetivo: 0 };
 type BrandConfig = typeof EMPTY_CONFIG;
 
-function text(value: SheetValue | undefined) {
+export function text(value: SheetValue | undefined) {
   return String(value || "").trim();
 }
 
@@ -81,7 +81,7 @@ function normalizeHeader(value: SheetValue | undefined) {
     .replace(/^_+|_+$/g, "");
 }
 
-function normalizeBrand(value: SheetValue | undefined) {
+export function normalizeBrand(value: SheetValue | undefined) {
   return text(value)
     .replace(/\u00a0/g, " ")
     .toUpperCase()
@@ -91,7 +91,7 @@ function normalizeBrand(value: SheetValue | undefined) {
     .replace(/\s+/g, " ");
 }
 
-function columns(headers: SheetValue[]) {
+export function columns(headers: SheetValue[]) {
   const indexes = new Map<string, number>();
   headers.forEach((header, index) => indexes.set(normalizeHeader(header), index));
   return (...names: string[]) => {
@@ -103,7 +103,7 @@ function columns(headers: SheetValue[]) {
   };
 }
 
-function value(row: SheetValue[], index: number): SheetValue {
+export function value(row: SheetValue[], index: number): SheetValue {
   return index < 0 ? "" : (row[index] ?? "");
 }
 
@@ -123,7 +123,7 @@ export function dashboardNumber(input: SheetValue | undefined) {
   return Number.isNaN(result) ? 0 : result;
 }
 
-function brandConfig(rows: SheetRows) {
+export function brandConfig(rows: SheetRows) {
   const result = new Map<string, BrandConfig>();
   if (rows.length < 2) return result;
   const column = columns(rows[0]);
@@ -144,7 +144,7 @@ function brandConfig(rows: SheetRows) {
   return result;
 }
 
-function brandAliases(rows: SheetRows) {
+export function brandAliases(rows: SheetRows) {
   const result = new Map<string, string>();
   if (rows.length < 2) return result;
   const column = columns(rows[0]);
@@ -164,7 +164,7 @@ function brandAliases(rows: SheetRows) {
   return result;
 }
 
-function formatDate(date: Date) {
+export function formatDate(date: Date) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: TIME_ZONE,
     year: "numeric",

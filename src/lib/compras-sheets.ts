@@ -3,7 +3,8 @@ import "server-only";
 import { JWT } from "google-auth-library";
 import { auth } from "@/auth";
 import { isPortalUserAllowed } from "@/lib/portal-auth";
-import { calculateComprasDashboard, type ComprasDashboard, type DashboardSheets, type SheetRows } from "@/lib/compras-dashboard";
+import { calculateComprasDashboard, type ComprasDashboard, type SheetRows } from "@/lib/compras-dashboard";
+import { calculateComprasGestion, type ComprasGestion } from "@/lib/compras-gestion";
 
 const READ_ONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEET_NAMES = {
@@ -13,6 +14,7 @@ const SHEET_NAMES = {
   controlStock: "CONTROL_IMPORTACIONES_STOCK",
   ventas: "VENTAS",
   logImportaciones: "LOG_IMPORTACIONES",
+  gestion: "GESTION_COMPRAS_ACTIVA",
 } as const;
 
 type SheetMetadata = { sheets?: Array<{ properties?: { title?: string } }> };
@@ -44,7 +46,9 @@ async function googleGet<T>(url: URL, accessToken: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function readDashboardSheets(): Promise<DashboardSheets> {
+type SheetKey = keyof typeof SHEET_NAMES;
+
+async function readSheets<const K extends SheetKey>(keys: readonly K[], required: K): Promise<Record<K, SheetRows>> {
   const { spreadsheetId, email, key } = settings();
   const client = new JWT({ email, key, scopes: [READ_ONLY_SCOPE] });
   let token: string | null | undefined;
@@ -60,9 +64,8 @@ async function readDashboardSheets(): Promise<DashboardSheets> {
   metadataUrl.searchParams.set("fields", "sheets(properties(title))");
   const metadata = await googleGet<SheetMetadata>(metadataUrl, token);
   const available = new Set(metadata.sheets?.map((sheet) => sheet.properties?.title).filter(Boolean));
-  if (!available.has(SHEET_NAMES.modelo)) throw new Error("No existe la hoja MODELO_COMPRAS.");
+  if (!available.has(SHEET_NAMES[required])) throw new Error(`No existe la hoja ${SHEET_NAMES[required]}.`);
 
-  const keys = Object.keys(SHEET_NAMES) as Array<keyof typeof SHEET_NAMES>;
   const present = keys.filter((keyName) => available.has(SHEET_NAMES[keyName]));
   const valuesUrl = new URL(`${base}/values:batchGet`);
   valuesUrl.searchParams.set("valueRenderOption", "UNFORMATTED_VALUE");
@@ -72,7 +75,7 @@ async function readDashboardSheets(): Promise<DashboardSheets> {
     valuesUrl.searchParams.append("ranges", sheetRange);
   }
   const response = await googleGet<ValuesResponse>(valuesUrl, token);
-  const result = Object.fromEntries(keys.map((keyName) => [keyName, [] as SheetRows])) as DashboardSheets;
+  const result = Object.fromEntries(keys.map((keyName) => [keyName, [] as SheetRows])) as Record<K, SheetRows>;
   present.forEach((keyName, index) => {
     result[keyName] = response.valueRanges?.[index]?.values ?? [];
   });
@@ -83,5 +86,14 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
   const session = await auth();
   const email = session?.user?.email;
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
-  return calculateComprasDashboard(await readDashboardSheets(), email);
+  const sheets = await readSheets(["modelo", "config", "alias", "controlStock", "ventas", "logImportaciones"], "modelo");
+  return calculateComprasDashboard(sheets, email);
+}
+
+export async function getComprasGestion(): Promise<ComprasGestion> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const sheets = await readSheets(["gestion", "config", "alias"], "gestion");
+  return calculateComprasGestion(sheets);
 }

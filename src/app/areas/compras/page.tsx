@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { AlertCircle, ArrowDownRight, Boxes, Clock3, PackageCheck, ShoppingCart, TrendingUp } from "lucide-react";
 import { auth } from "@/auth";
 import { ComprasDashboardActions } from "@/components/compras-dashboard-actions";
+import { ComprasGestionWorkspace } from "@/components/compras-gestion-workspace";
+import { ComprasHistorialWorkspace } from "@/components/compras-historial-workspace";
 import { isPortalUserAllowed } from "@/lib/portal-auth";
-import { getComprasDashboard } from "@/lib/compras-sheets";
+import { getComprasDashboard, getComprasGestion } from "@/lib/compras-sheets";
 import type { ComprasDashboard, DashboardBrand, DashboardSource } from "@/lib/compras-dashboard";
+import type { ComprasGestion } from "@/lib/compras-gestion";
 
 export const metadata: Metadata = {
   title: "Compras | Grupo Aftermarket",
@@ -168,46 +172,60 @@ function DashboardContent({ dashboard }: { dashboard: ComprasDashboard }) {
   );
 }
 
-export default async function ComprasPage() {
+export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ vista?: string | string[]; sku?: string | string[] }> }) {
   const session = await auth();
   if (!session?.user?.email || !isPortalUserAllowed(session.user.email)) return null;
+  const params = await searchParams;
+  const vista = params.vista;
+  const isGestion = vista === "gestion";
+  const isHistorial = vista === "historial";
+  const historialSku = typeof params.sku === "string" ? params.sku.trim().slice(0, 100) : "";
 
   let dashboard: ComprasDashboard | null = null;
+  let gestion: ComprasGestion | null = null;
   let error: string | null = null;
   try {
-    dashboard = await getComprasDashboard();
+    if (isGestion) gestion = await getComprasGestion();
+    else if (!isHistorial) dashboard = await getComprasDashboard();
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "";
-    error = /^(Falta configurar|No se pudo (leer|conectar|autenticar)|No existe la hoja|MODELO_COMPRAS no contiene|No se encontraron SKU|ALIAS_MARCAS_COMPRA debe contener)/.test(message)
+    error = /^(Falta configurar|No se pudo (leer|conectar|autenticar)|No existe la hoja|MODELO_COMPRAS no contiene|No se encontraron SKU|ALIAS_MARCAS_COMPRA debe contener|GESTION_COMPRAS_ACTIVA no contiene)/.test(message)
       ? message
-      : "No se pudo cargar el Dashboard de Compras.";
+      : `No se pudo cargar ${isGestion ? "Gestión de Compras" : "el Dashboard de Compras"}.`;
   }
 
   return (
     <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
-      <main className="mx-auto max-w-[1440px] px-5 py-8 lg:px-10 lg:py-10">
-        <section className="relative flex min-h-48 flex-wrap items-end justify-between gap-6 overflow-hidden rounded-[28px] bg-[var(--navy)] px-7 py-8 text-white shadow-[0_24px_60px_-36px_rgba(14,40,65,0.72)] sm:px-9">
+      <main className={`mx-auto ${isGestion ? "max-w-[1920px] px-4 py-5 lg:px-5 lg:py-6" : "max-w-[1440px] px-5 py-8 lg:px-10 lg:py-10"}`}>
+        <section className={`relative flex flex-wrap items-end justify-between gap-6 overflow-hidden bg-[var(--navy)] text-white shadow-[0_24px_60px_-36px_rgba(14,40,65,0.72)] ${isGestion ? "min-h-32 rounded-[22px] px-6 py-5" : "min-h-48 rounded-[28px] px-7 py-8 sm:px-9"}`}>
           <div aria-hidden="true" className="absolute -right-12 -top-24 size-72 rounded-full border border-white/10" />
           <div aria-hidden="true" className="absolute right-24 top-20 size-36 rounded-full border border-white/10" />
           <div className="relative z-10 max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/55">Abastecimiento · Dashboard</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Compras</h1>
-            <p className="mt-3 text-sm leading-6 text-white/60">Riesgos de stock, cobertura y recomendaciones de compra, consolidados por marca.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/55">Abastecimiento · {isHistorial ? "Historial SKU" : isGestion ? "Gestión" : "Dashboard"}</p>
+            <h1 className={`${isGestion ? "mt-1 text-2xl sm:text-3xl" : "mt-3 text-3xl sm:text-4xl"} font-semibold tracking-[-0.04em]`}>Compras</h1>
+            <p className={`${isGestion ? "mt-1" : "mt-3"} text-sm leading-6 text-white/60`}>{isHistorial ? "Trazabilidad de las decisiones y compras por SKU." : isGestion ? "Decisiones, riesgos y recomendaciones de compra por SKU, en modo consulta." : "Riesgos de stock, cobertura y recomendaciones de compra, consolidados por marca."}</p>
           </div>
-          <p className="relative z-10 text-xs text-white/60">Actualizado: <span className="font-semibold text-white">{dashboard?.actualizado ?? "Sin datos"}</span></p>
+          {!isHistorial && <p className="relative z-10 text-xs text-white/60">Actualizado: <span className="font-semibold text-white">{(isGestion ? gestion?.actualizado : dashboard?.actualizado) ?? "Sin datos"}</span></p>}
         </section>
 
-        <div className="mt-5 flex justify-end"><ComprasDashboardActions canExport={Boolean(dashboard)} /></div>
+        <div className={`${isGestion ? "mt-3" : "mt-5"} flex flex-wrap items-center justify-between gap-3`}>
+          <nav aria-label="Vistas de Compras" className="inline-flex rounded-2xl border border-[var(--line)] bg-white p-1">
+            <Link href="/areas/compras" prefetch={false} aria-current={!isGestion && !isHistorial ? "page" : undefined} className={`rounded-xl px-4 py-2.5 text-xs font-semibold transition ${!isGestion && !isHistorial ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Dashboard</Link>
+            <Link href="/areas/compras?vista=gestion" prefetch={false} aria-current={isGestion ? "page" : undefined} className={`rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isGestion ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Gestión de Compras</Link>
+            <Link href="/areas/compras?vista=historial" prefetch={false} aria-current={isHistorial ? "page" : undefined} className={`rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isHistorial ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Historial SKU</Link>
+          </nav>
+          {!isHistorial && <ComprasDashboardActions canExport={Boolean(dashboard) && !isGestion} />}
+        </div>
 
         {error ? (
           <div role="alert" className="mt-5 flex items-start gap-3 rounded-[22px] border border-red-200 bg-white px-5 py-6 text-red-800">
             <AlertCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
             <div>
-              <p className="font-semibold">No se pudo cargar el Dashboard de Compras</p>
+              <p className="font-semibold">No se pudo cargar {isGestion ? "Gestión de Compras" : "el Dashboard de Compras"}</p>
               <p className="mt-1 text-sm">{error}</p>
             </div>
           </div>
-        ) : dashboard ? <DashboardContent dashboard={dashboard} /> : null}
+        ) : isHistorial ? <ComprasHistorialWorkspace sku={historialSku} /> : isGestion && gestion ? <ComprasGestionWorkspace gestion={gestion} /> : dashboard ? <DashboardContent dashboard={dashboard} /> : null}
       </main>
     </div>
   );
