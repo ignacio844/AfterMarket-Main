@@ -5,6 +5,8 @@ import { auth } from "@/auth";
 import { isPortalUserAllowed } from "@/lib/portal-auth";
 import { calculateComprasDashboard, type ComprasDashboard, type SheetRows } from "@/lib/compras-dashboard";
 import { calculateComprasGestion, type ComprasGestion } from "@/lib/compras-gestion";
+import { calculateComprasHistorial, type ComprasHistorial } from "@/lib/compras-historial";
+import { calculateComprasEnvios, type ComprasEnvios } from "@/lib/compras-envios";
 
 const READ_ONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEET_NAMES = {
@@ -15,9 +17,14 @@ const SHEET_NAMES = {
   ventas: "VENTAS",
   logImportaciones: "LOG_IMPORTACIONES",
   gestion: "GESTION_COMPRAS_ACTIVA",
+  gestionHistorial: "GESTION_COMPRAS",
+  enviosCompra: "ENVIOS_COMPRA",
+  procesoCompra: "COMPRAS_EN_PROCESO",
+  movimientosCompra: "MOVIMIENTOS_COMPRA",
+  ordenesCompra: "ORDENES_COMPRA_PORTAL",
 } as const;
 
-type SheetMetadata = { sheets?: Array<{ properties?: { title?: string } }> };
+type SheetMetadata = { properties?: { timeZone?: string }; sheets?: Array<{ properties?: { title?: string } }> };
 type ValuesResponse = { valueRanges?: Array<{ values?: SheetRows }> };
 
 function settings() {
@@ -48,7 +55,7 @@ async function googleGet<T>(url: URL, accessToken: string): Promise<T> {
 
 type SheetKey = keyof typeof SHEET_NAMES;
 
-async function readSheets<const K extends SheetKey>(keys: readonly K[], required: K): Promise<Record<K, SheetRows>> {
+async function readSheets<const K extends SheetKey>(keys: readonly K[], required: K | null): Promise<{ sheets: Record<K, SheetRows>; timeZone: string }> {
   const { spreadsheetId, email, key } = settings();
   const client = new JWT({ email, key, scopes: [READ_ONLY_SCOPE] });
   let token: string | null | undefined;
@@ -61,12 +68,16 @@ async function readSheets<const K extends SheetKey>(keys: readonly K[], required
 
   const base = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}`;
   const metadataUrl = new URL(base);
-  metadataUrl.searchParams.set("fields", "sheets(properties(title))");
+  metadataUrl.searchParams.set("fields", "properties(timeZone),sheets(properties(title))");
   const metadata = await googleGet<SheetMetadata>(metadataUrl, token);
   const available = new Set(metadata.sheets?.map((sheet) => sheet.properties?.title).filter(Boolean));
-  if (!available.has(SHEET_NAMES[required])) throw new Error(`No existe la hoja ${SHEET_NAMES[required]}.`);
+  if (required && !available.has(SHEET_NAMES[required])) throw new Error(`No existe la hoja ${SHEET_NAMES[required]}.`);
 
   const present = keys.filter((keyName) => available.has(SHEET_NAMES[keyName]));
+  const result = Object.fromEntries(keys.map((keyName) => [keyName, [] as SheetRows])) as Record<K, SheetRows>;
+  if (present.length === 0) {
+    return { sheets: result, timeZone: metadata.properties?.timeZone || "America/Argentina/Buenos_Aires" };
+  }
   const valuesUrl = new URL(`${base}/values:batchGet`);
   valuesUrl.searchParams.set("valueRenderOption", "UNFORMATTED_VALUE");
   valuesUrl.searchParams.set("dateTimeRenderOption", "SERIAL_NUMBER");
@@ -75,18 +86,17 @@ async function readSheets<const K extends SheetKey>(keys: readonly K[], required
     valuesUrl.searchParams.append("ranges", sheetRange);
   }
   const response = await googleGet<ValuesResponse>(valuesUrl, token);
-  const result = Object.fromEntries(keys.map((keyName) => [keyName, [] as SheetRows])) as Record<K, SheetRows>;
   present.forEach((keyName, index) => {
     result[keyName] = response.valueRanges?.[index]?.values ?? [];
   });
-  return result;
+  return { sheets: result, timeZone: metadata.properties?.timeZone || "America/Argentina/Buenos_Aires" };
 }
 
 export async function getComprasDashboard(): Promise<ComprasDashboard> {
   const session = await auth();
   const email = session?.user?.email;
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
-  const sheets = await readSheets(["modelo", "config", "alias", "controlStock", "ventas", "logImportaciones"], "modelo");
+  const { sheets } = await readSheets(["modelo", "config", "alias", "controlStock", "ventas", "logImportaciones"], "modelo");
   return calculateComprasDashboard(sheets, email);
 }
 
@@ -94,6 +104,26 @@ export async function getComprasGestion(): Promise<ComprasGestion> {
   const session = await auth();
   const email = session?.user?.email;
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
-  const sheets = await readSheets(["gestion", "config", "alias"], "gestion");
-  return calculateComprasGestion(sheets);
+  const { sheets, timeZone } = await readSheets(["gestion", "config", "alias"], "gestion");
+  return calculateComprasGestion(sheets, new Date(), timeZone);
+}
+
+export async function getComprasHistorial(sku: string): Promise<ComprasHistorial> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  if (!sku.trim() || sku.length > 100) throw new Error("Ingresá un SKU válido.");
+  const { sheets, timeZone } = await readSheets(
+    ["gestion", "config", "alias", "gestionHistorial", "enviosCompra", "procesoCompra", "movimientosCompra"],
+    null,
+  );
+  return calculateComprasHistorial({ gestionActiva: sheets.gestion, ...sheets }, sku, timeZone);
+}
+
+export async function getComprasEnvios(): Promise<ComprasEnvios> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets, timeZone } = await readSheets(["enviosCompra", "ordenesCompra", "procesoCompra"], "enviosCompra");
+  return calculateComprasEnvios(sheets, timeZone);
 }

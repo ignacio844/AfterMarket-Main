@@ -3,6 +3,7 @@ import {
   brandAliases, brandConfig, columns, dashboardNumber, formatDate,
   normalizeBrand, text, value, type SheetRows, type SheetValue,
 } from "@/lib/compras-dashboard";
+import { sheetSerialDate } from "@/lib/compras-dates";
 
 export type GestionRegistro = {
   sku: string;
@@ -42,11 +43,11 @@ export const GESTION_ESTADOS = [
   "PENDIENTE", "COTIZAR", "APROBADO", "NO COMPRAR", "POSTERGAR", "ENVIADO A COMPRA",
 ];
 
-function decisionDate(input: SheetValue) {
+function decisionDate(input: SheetValue, timeZone: string) {
   if (!input) return "";
   // Sheets returns native date cells as serial numbers, not Apps Script Date objects.
   const date = typeof input === "number"
-    ? new Date(Date.UTC(1899, 11, 30) + input * 86_400_000 + 3 * 3_600_000)
+    ? sheetSerialDate(input, timeZone)
     : new Date(String(input));
   return Number.isNaN(date.getTime()) ? String(input) : formatDate(date);
 }
@@ -54,6 +55,7 @@ function decisionDate(input: SheetValue) {
 export function calculateComprasGestion(
   sheets: { gestion: SheetRows; config: SheetRows; alias: SheetRows },
   now = new Date(),
+  sheetTimeZone = "America/Argentina/Buenos_Aires",
 ): ComprasGestion {
   const { gestion } = sheets;
   const empty = {
@@ -109,7 +111,7 @@ export function calculateComprasGestion(
       cantidadDecidida: dashboardNumber(value(row, cCantidad)),
       responsable: text(value(row, cResponsable)),
       observacion: text(value(row, cObservacion)),
-      fechaDecision: decisionDate(value(row, cFecha)),
+      fechaDecision: decisionDate(value(row, cFecha), sheetTimeZone),
     });
   }
 

@@ -7,6 +7,9 @@ registerHooks({
     if (specifier === "@/lib/compras-dashboard") {
       return nextResolve(new URL("../src/lib/compras-dashboard.ts", import.meta.url).href, context);
     }
+    if (specifier === "@/lib/compras-dates") {
+      return nextResolve(new URL("../src/lib/compras-dates.ts", import.meta.url).href, context);
+    }
     return nextResolve(specifier, context);
   },
 });
