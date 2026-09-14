@@ -6,12 +6,14 @@ import { ComprasDashboardActions } from "@/components/compras-dashboard-actions"
 import { ComprasGestionWorkspace } from "@/components/compras-gestion-workspace";
 import { ComprasHistorialWorkspace } from "@/components/compras-historial-workspace";
 import { ComprasEnviosWorkspace } from "@/components/compras-envios-workspace";
+import { ComprasCotizacionesWorkspace } from "@/components/compras-cotizaciones-workspace";
 import { isPortalUserAllowed } from "@/lib/portal-auth";
-import { getComprasDashboard, getComprasGestion, getComprasHistorial, getComprasEnvios } from "@/lib/compras-sheets";
+import { getComprasDashboard, getComprasGestion, getComprasHistorial, getComprasEnvios, getComprasCotizaciones } from "@/lib/compras-sheets";
 import type { ComprasDashboard, DashboardBrand, DashboardSource } from "@/lib/compras-dashboard";
 import type { ComprasGestion } from "@/lib/compras-gestion";
 import type { ComprasHistorial } from "@/lib/compras-historial";
 import type { ComprasEnvios } from "@/lib/compras-envios";
+import type { ComprasCotizaciones } from "@/lib/compras-cotizaciones";
 
 export const metadata: Metadata = {
   title: "Compras | Grupo Aftermarket",
@@ -183,58 +185,63 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const isGestion = vista === "gestion";
   const isHistorial = vista === "historial";
   const isEnvios = vista === "envios";
+  const isCotizaciones = vista === "cotizaciones";
+  const isWide = isGestion || isCotizaciones;
   const historialSku = typeof params.sku === "string" ? params.sku.trim().slice(0, 100) : "";
 
   let dashboard: ComprasDashboard | null = null;
   let gestion: ComprasGestion | null = null;
   let historial: ComprasHistorial | null = null;
   let envios: ComprasEnvios | null = null;
+  let cotizaciones: ComprasCotizaciones | null = null;
   let error: string | null = null;
   try {
     if (isGestion) gestion = await getComprasGestion();
     else if (isHistorial && historialSku) historial = await getComprasHistorial(historialSku);
     else if (isEnvios) envios = await getComprasEnvios();
+    else if (isCotizaciones) cotizaciones = await getComprasCotizaciones();
     else if (!isHistorial) dashboard = await getComprasDashboard();
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "";
-    error = /^(Falta configurar|No se pudo (leer|conectar|autenticar)|No existe la hoja|MODELO_COMPRAS no contiene|No se encontraron SKU|No se encontró historial|No se encontró la columna SKU|ALIAS_MARCAS_COMPRA debe contener|GESTION_COMPRAS_ACTIVA no contiene|ENVIOS_COMPRA no contiene)/.test(message)
+    error = /^(Falta configurar|No se pudo (leer|conectar|autenticar)|No existe la hoja|MODELO_COMPRAS no contiene|No se encontraron SKU|No se encontró historial|No se encontró la columna SKU|ALIAS_MARCAS_COMPRA debe contener|GESTION_COMPRAS_ACTIVA no contiene|ENVIOS_COMPRA no contiene|COTIZACIONES_COMPRA no contiene)/.test(message)
       ? message
-      : `No se pudo cargar ${isHistorial ? "Historial SKU" : isGestion ? "Gestión de Compras" : isEnvios ? "Enviados a Compra" : "el Dashboard de Compras"}.`;
+      : `No se pudo cargar ${isHistorial ? "Historial SKU" : isGestion ? "Gestión de Compras" : isEnvios ? "Enviados a Compra" : isCotizaciones ? "Cotizaciones" : "el Dashboard de Compras"}.`;
   }
 
   return (
     <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
-      <main className={`mx-auto ${isGestion ? "max-w-[1920px] px-4 py-5 lg:px-5 lg:py-6" : "max-w-[1440px] px-5 py-8 lg:px-10 lg:py-10"}`}>
-        <section className={`relative flex flex-wrap items-end justify-between gap-6 overflow-hidden bg-[var(--navy)] text-white shadow-[0_24px_60px_-36px_rgba(14,40,65,0.72)] ${isGestion ? "min-h-32 rounded-[22px] px-6 py-5" : "min-h-48 rounded-[28px] px-7 py-8 sm:px-9"}`}>
+      <main className={`mx-auto ${isWide ? "max-w-[1920px] px-4 py-5 lg:px-5 lg:py-6" : "max-w-[1440px] px-5 py-8 lg:px-10 lg:py-10"}`}>
+        <section className={`relative flex flex-wrap items-end justify-between gap-6 overflow-hidden bg-[var(--navy)] text-white shadow-[0_24px_60px_-36px_rgba(14,40,65,0.72)] ${isWide ? "min-h-32 rounded-[22px] px-6 py-5" : "min-h-48 rounded-[28px] px-7 py-8 sm:px-9"}`}>
           <div aria-hidden="true" className="absolute -right-12 -top-24 size-72 rounded-full border border-white/10" />
           <div aria-hidden="true" className="absolute right-24 top-20 size-36 rounded-full border border-white/10" />
           <div className="relative z-10 max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/55">Abastecimiento · {isHistorial ? "Historial SKU" : isGestion ? "Gestión" : isEnvios ? "Enviados a Compra" : "Dashboard"}</p>
-            <h1 className={`${isGestion ? "mt-1 text-2xl sm:text-3xl" : "mt-3 text-3xl sm:text-4xl"} font-semibold tracking-[-0.04em]`}>Compras</h1>
-            <p className={`${isGestion ? "mt-1" : "mt-3"} text-sm leading-6 text-white/60`}>{isHistorial ? "Trazabilidad de las decisiones y compras por SKU." : isGestion ? "Decisiones, riesgos y recomendaciones de compra por SKU, en modo consulta." : isEnvios ? "Lotes enviados, cantidades y órdenes de compra asociadas." : "Riesgos de stock, cobertura y recomendaciones de compra, consolidados por marca."}</p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/55">Abastecimiento · {isHistorial ? "Historial SKU" : isGestion ? "Gestión" : isEnvios ? "Enviados a Compra" : isCotizaciones ? "Cotizaciones" : "Dashboard"}</p>
+            <h1 className={`${isWide ? "mt-1 text-2xl sm:text-3xl" : "mt-3 text-3xl sm:text-4xl"} font-semibold tracking-[-0.04em]`}>Compras</h1>
+            <p className={`${isWide ? "mt-1" : "mt-3"} text-sm leading-6 text-white/60`}>{isHistorial ? "Trazabilidad de las decisiones y compras por SKU." : isGestion ? "Decisiones, riesgos y recomendaciones de compra por SKU, en modo consulta." : isEnvios ? "Lotes enviados, cantidades y órdenes de compra asociadas." : isCotizaciones ? "Pendientes importados, lotes de cotización y ofertas de proveedores." : "Riesgos de stock, cobertura y recomendaciones de compra, consolidados por marca."}</p>
           </div>
-          {!isHistorial && !isEnvios && <p className="relative z-10 text-xs text-white/60">Actualizado: <span className="font-semibold text-white">{(isGestion ? gestion?.actualizado : dashboard?.actualizado) ?? "Sin datos"}</span></p>}
+          {!isHistorial && !isEnvios && !isCotizaciones && <p className="relative z-10 text-xs text-white/60">Actualizado: <span className="font-semibold text-white">{(isGestion ? gestion?.actualizado : dashboard?.actualizado) ?? "Sin datos"}</span></p>}
         </section>
 
-        <div className={`${isGestion ? "mt-3" : "mt-5"} flex flex-wrap items-center justify-between gap-3`}>
+        <div className={`${isWide ? "mt-3" : "mt-5"} flex flex-wrap items-center justify-between gap-3`}>
           <nav aria-label="Vistas de Compras" className="inline-flex max-w-full overflow-x-auto rounded-2xl border border-[var(--line)] bg-white p-1">
-            <Link href="/areas/compras" prefetch={false} aria-current={!isGestion && !isHistorial && !isEnvios ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${!isGestion && !isHistorial && !isEnvios ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Dashboard</Link>
+            <Link href="/areas/compras" prefetch={false} aria-current={!isGestion && !isHistorial && !isEnvios && !isCotizaciones ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${!isGestion && !isHistorial && !isEnvios && !isCotizaciones ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Dashboard</Link>
             <Link href="/areas/compras?vista=gestion" prefetch={false} aria-current={isGestion ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isGestion ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Gestión de Compras</Link>
+            <Link href="/areas/compras?vista=cotizaciones" prefetch={false} aria-current={isCotizaciones ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isCotizaciones ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Cotizaciones</Link>
             <Link href="/areas/compras?vista=historial" prefetch={false} aria-current={isHistorial ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isHistorial ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Historial SKU</Link>
             <Link href="/areas/compras?vista=envios" prefetch={false} aria-current={isEnvios ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isEnvios ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Enviados a Compra</Link>
           </nav>
-          {!isHistorial && !isEnvios && <ComprasDashboardActions canExport={Boolean(dashboard) && !isGestion} />}
+          {!isHistorial && !isEnvios && !isCotizaciones && <ComprasDashboardActions canExport={Boolean(dashboard) && !isGestion} />}
         </div>
 
         {error && !isHistorial ? (
           <div role="alert" className="mt-5 flex items-start gap-3 rounded-[22px] border border-red-200 bg-white px-5 py-6 text-red-800">
             <AlertCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
             <div>
-              <p className="font-semibold">No se pudo cargar {isGestion ? "Gestión de Compras" : isEnvios ? "Enviados a Compra" : "el Dashboard de Compras"}</p>
+              <p className="font-semibold">No se pudo cargar {isGestion ? "Gestión de Compras" : isEnvios ? "Enviados a Compra" : isCotizaciones ? "Cotizaciones" : "el Dashboard de Compras"}</p>
               <p className="mt-1 text-sm">{error}</p>
             </div>
           </div>
-        ) : isHistorial ? <ComprasHistorialWorkspace sku={historialSku} historial={historial} error={error} /> : isGestion && gestion ? <ComprasGestionWorkspace gestion={gestion} /> : isEnvios && envios ? <ComprasEnviosWorkspace data={envios} /> : dashboard ? <DashboardContent dashboard={dashboard} /> : null}
+        ) : isHistorial ? <ComprasHistorialWorkspace sku={historialSku} historial={historial} error={error} /> : isGestion && gestion ? <ComprasGestionWorkspace gestion={gestion} /> : isEnvios && envios ? <ComprasEnviosWorkspace data={envios} /> : isCotizaciones && cotizaciones ? <ComprasCotizacionesWorkspace data={cotizaciones} /> : dashboard ? <DashboardContent dashboard={dashboard} /> : null}
       </main>
     </div>
   );

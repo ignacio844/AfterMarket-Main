@@ -7,6 +7,7 @@ import { calculateComprasDashboard, type ComprasDashboard, type SheetRows } from
 import { calculateComprasGestion, type ComprasGestion } from "@/lib/compras-gestion";
 import { calculateComprasHistorial, type ComprasHistorial } from "@/lib/compras-historial";
 import { calculateComprasEnvios, type ComprasEnvios } from "@/lib/compras-envios";
+import { calculateComprasCotizaciones, type ComprasCotizaciones } from "@/lib/compras-cotizaciones";
 
 const READ_ONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEET_NAMES = {
@@ -22,6 +23,8 @@ const SHEET_NAMES = {
   procesoCompra: "COMPRAS_EN_PROCESO",
   movimientosCompra: "MOVIMIENTOS_COMPRA",
   ordenesCompra: "ORDENES_COMPRA_PORTAL",
+  cotizaciones: "COTIZACIONES_COMPRA",
+  ofertas: "COTIZACIONES_OFERTAS",
 } as const;
 
 type SheetMetadata = { properties?: { timeZone?: string }; sheets?: Array<{ properties?: { title?: string } }> };
@@ -126,4 +129,15 @@ export async function getComprasEnvios(): Promise<ComprasEnvios> {
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
   const { sheets, timeZone } = await readSheets(["enviosCompra", "ordenesCompra", "procesoCompra"], "enviosCompra");
   return calculateComprasEnvios(sheets, timeZone);
+}
+
+export async function getComprasCotizaciones(): Promise<ComprasCotizaciones> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets, timeZone } = await readSheets(
+    ["gestion", "cotizaciones", "ofertas", "config", "alias"],
+    "gestion",
+  );
+  return calculateComprasCotizaciones(sheets, timeZone);
 }

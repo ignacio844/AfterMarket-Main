@@ -16,6 +16,7 @@ No modificar otras secciones del portal salvo lo estrictamente necesario para Co
 | --- | --- | --- |
 | Dashboard | `/areas/compras` | Port de `obtenerDashboardPortalCompras()` y representación adaptada de `cargarDashboard()` / `dibujarMarcasDashboard()`. KPIs, estado de fuentes y tablas por origen. Exportación XLSX del Dashboard. |
 | Gestión de Compras | `/areas/compras?vista=gestion` | Port read-only de `obtenerGestionComprasPortal()`: registros, filtros por texto/riesgo/estado/marca/política, resumen sobre registros filtrados y tabla paginada de 50 filas. |
+| Cotizaciones | `/areas/compras?vista=cotizaciones` | Port read-only de `obtenerBandejaCotizacionPortal()` y `obtenerCotizacionesPortal()`: pendientes importados, lotes CT, ofertas y ranking por SKU/moneda. |
 | Historial SKU | `/areas/compras?vista=historial&sku=...` | Port read-only de `obtenerHistorialSkuPortal()`: situación actual, buscador y línea de tiempo cronológica con decisión, envíos y movimientos. |
 | Enviados a Compra | `/areas/compras?vista=envios` | Port read-only de `obtenerEnviosCompraPortal()`: lotes, KPIs, filtros, OC asociadas y detalle de SKU por envío. |
 
@@ -27,6 +28,7 @@ Los botones **Gestionar** e **Historial** son visibles en cada fila. **Gestionar
 
 - Dashboard: lee `MODELO_COMPRAS`, `CONFIG_MARCAS_COMPRA`, `ALIAS_MARCAS_COMPRA`, `CONTROL_IMPORTACIONES_STOCK`, `VENTAS` y `LOG_IMPORTACIONES`.
 - Gestión: lee `GESTION_COMPRAS_ACTIVA`, `CONFIG_MARCAS_COMPRA` y `ALIAS_MARCAS_COMPRA`. El origen y la política de compra se resuelven desde configuración y alias, como en el legacy; no se toman de columnas precalculadas de la hoja de Gestión.
+- Cotizaciones: lee `GESTION_COMPRAS_ACTIVA`, `COTIZACIONES_COMPRA`, `COTIZACIONES_OFERTAS`, y sólo si falta `ORIGEN` en la hoja activa usa la configuración/alias de marcas. La bandeja incluye sólo SKU `IMPORTADO` con estado `COTIZAR` y `CANTIDAD_DECIDIDA > 0`, excluyendo los que figuran en una CT `ABIERTA`. Ordena por marca/SKU y calcula SKU, unidades y marcas. Los lotes CT agrupan sus ítems por `NRO_COTIZACION`; las ofertas se agrupan por proveedor (sin distinguir mayúsculas), con precio, cantidad, subtotal y total. El ranking compara precios unitarios positivos por SKU dentro de una misma moneda: empates en el mínimo son **MEJOR PRECIO** y el siguiente valor distinto es **2° PRECIO**. Para CT cerradas se muestra inicialmente la oferta seleccionada y se pueden expandir las demás.
 - Historial SKU: lee `GESTION_COMPRAS_ACTIVA`, `CONFIG_MARCAS_COMPRA`, `ALIAS_MARCAS_COMPRA`, `GESTION_COMPRAS`, `ENVIOS_COMPRA`, `COMPRAS_EN_PROCESO` y `MOVIMIENTOS_COMPRA`. `GESTION_COMPRAS_ACTIVA` aporta stock, consumo, cobertura, descripción y marca; `GESTION_COMPRAS` aporta la última decisión; `ENVIOS_COMPRA` y `MOVIMIENTOS_COMPRA` aportan todos los eventos respectivos; la última fila del SKU en `COMPRAS_EN_PROCESO` aporta estado y cantidades actuales. Si no hay eventos, se muestra el error legacy de SKU sin historial.
 - Enviados a Compra: lee `ENVIOS_COMPRA`, `ORDENES_COMPRA_PORTAL` y `COMPRAS_EN_PROCESO`. Agrupa por `NRO_ENVIO`, cuenta filas/SKU, suma `CANTIDAD_DECIDIDA`, cuenta marcas distintas y ordena los lotes por número descendente. Las OC se deduplican por envío y número; el detalle indica la OC del SKU cuando existe. `COMPRAS_EN_PROCESO` y `ORDENES_COMPRA_PORTAL` aportan la lista única de proveedores, como `obtenerProveedoresOcPortal()`. Filtros locales por texto, fechas y marca; los KPIs superiores corresponden al total y el resumen inferior a los lotes visibles. No se portaron `generarOrdenCompraPortal()` ni la impresión de OC.
 - Las fechas seriales del Historial se interpretan con la zona horaria declarada por la planilla y se presentan en `America/Argentina/Buenos_Aires`, como el Apps Script. La planilla consultada declara `America/Los_Angeles`; por eso una celda visible como `07:15` allí aparece como `11:15` en el historial durante agosto. La conversión considera horario de verano.
@@ -42,6 +44,8 @@ El último control read-only de Google Sheets confirmó encabezados compatibles 
 - `src/components/compras-gestion-workspace.tsx`: filtros, resumen, tabla, panel prototipo de Gestión y enlace a Historial SKU.
 - `src/components/compras-historial-workspace.tsx`: pantalla de Historial SKU y buscador de navegación, sin datos históricos simulados.
 - `src/components/compras-envios-workspace.tsx`: filtros y ventana emergente de detalle read-only de Enviados a Compra.
+- `src/components/compras-cotizaciones-workspace.tsx`: bandeja, lotes, ofertas y ranking de Cotizaciones.
+- `src/lib/compras-cotizaciones.ts`: mapeo y cálculos puros de Cotizaciones.
 - `src/lib/compras-envios.ts`: agrupación, KPIs y filtros puros de Enviados.
 - `src/lib/compras-dates.ts`: conversión compartida de fechas seriales con la zona horaria de la planilla.
 - `src/lib/compras-historial.ts`: mapeo puro de situación actual y eventos históricos.
@@ -50,7 +54,7 @@ El último control read-only de Google Sheets confirmó encabezados compatibles 
 - `src/lib/compras-dashboard.ts`: cálculos puros del Dashboard y utilidades compartidas.
 - `src/lib/compras-gestion.ts`: mapeo, filtros y resumen puros de Gestión.
 - `src/app/api/compras/dashboard-export/route.ts`: XLSX del Dashboard, sin escrituras en Google.
-- `tests/compras-dashboard.test.mjs`, `tests/compras-gestion.test.mjs`, `tests/compras-historial.test.mjs` y `tests/compras-envios.test.mjs`: pruebas de lógica.
+- `tests/compras-dashboard.test.mjs`, `tests/compras-gestion.test.mjs`, `tests/compras-historial.test.mjs`, `tests/compras-envios.test.mjs` y `tests/compras-cotizaciones.test.mjs`: pruebas de lógica.
 
 Las variables requeridas en `.env.local` son `GOOGLE_SHEETS_SPREADSHEET_ID`, `GOOGLE_SERVICE_ACCOUNT_EMAIL` y `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`. **No registrar sus valores en este documento ni enviarlos al navegador.**
 
@@ -60,6 +64,8 @@ La lógica de Dashboard, Gestión e Historial pasó 11 pruebas unitarias en la e
 
 La diferencia de horas observada previamente en `FECHA_DECISION` de **Gestión** ya tiene causa: la planilla usa `America/Los_Angeles` y el proyecto Apps Script `America/Argentina/Buenos_Aires`. Gestión e Historial SKU ahora interpretan los seriales según la zona horaria real de la planilla. No se modificaron datos en Sheets.
 
-Pendiente de aprobación y definición funcional: conectar **Guardar** de Gestión y **Generar OC** de Enviados (implicarían escritura y reglas de autorización/concurrencia). En el modal de Enviados, la selección, el proveedor y el nuevo proveedor son borradores locales; **Generar OC** está visible pero deshabilitado y cerrar descarta el borrador. La impresión de OC también queda para una etapa posterior. Siguen fuera de alcance Packing List, Contenedores, Seguimiento, Recepciones y Transferencias. No habilitar operaciones remotas de escritura sin implementación real y validación específica.
+Cotizaciones pasó una comprobación de tipos, ESLint focalizado y una prueba puntual que cubre elegibilidad, exclusión de CT abiertas, agrupación de ofertas y ranking; no se ejecutó una compilación completa. Aún falta comparar visualmente la nueva vista con datos reales del portal. La selección de pendientes, los códigos/precios y los datos del importador son borradores locales; **Crear cotización**, **Guardar oferta**, **Aprobar oferta**, **Plantilla** e **Importar ofertas** se muestran deshabilitados. Ninguno escribe en Google Sheets.
+
+Pendiente de aprobación y definición funcional: conectar **Guardar** de Gestión, **Generar OC** de Enviados y los flujos de escritura de Cotizaciones (creación de CT, guardado/importación y aprobación de ofertas). En el modal de Enviados, la selección, el proveedor y el nuevo proveedor son borradores locales; **Generar OC** está visible pero deshabilitado y cerrar descarta el borrador. La plantilla XLSX y la impresión de OC también quedan para etapas posteriores. Siguen fuera de alcance Packing List, Contenedores, Seguimiento, Recepciones y Transferencias. No habilitar operaciones remotas de escritura sin implementación real y validación específica.
 
 Este proyecto usa Next.js 16.3.4. Antes de modificar código Next, consultar la guía pertinente en `node_modules/next/dist/docs/`, según `AGENTS.md`.
