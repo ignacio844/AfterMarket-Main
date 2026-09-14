@@ -18,7 +18,7 @@ function Estado({ value }: { value: string }) {
       : estado === "EN GESTION"
         ? "bg-amber-100 text-amber-800"
         : "bg-slate-100 text-slate-700";
-  return <span className={`whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-semibold ${tone}`}>{value || "PENDIENTE"}</span>;
+  return <span className={`inline-flex whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-semibold leading-none ${tone}`}>{value || "PENDIENTE"}</span>;
 }
 
 function exportCsv(registros: ProcesoRegistro[]) {
@@ -108,21 +108,62 @@ export function ComprasProcesoWorkspace({ data }: { data: ComprasProceso }) {
     </div>
 
     <section aria-label="Tabla de compras en proceso" className="overflow-hidden rounded-[22px] border border-[var(--line)] bg-white">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1580px] border-collapse text-left text-[11px]">
-          <thead className="bg-[var(--navy)] text-[10px] font-bold uppercase text-white"><tr>
-            <th className="px-2 py-2.5">Lote</th><th className="px-2 py-2.5">Fecha envío</th><th className="px-2 py-2.5">SKU</th><th className="px-2 py-2.5">Descripción</th><th className="px-2 py-2.5">Marca</th>
-            <th className="px-2 py-2.5 text-right">Cant. solicitada</th><th className="px-2 py-2.5">Estado</th><th className="px-2 py-2.5">Proveedor</th><th className="px-2 py-2.5 text-right">Cant. comprada</th><th className="px-2 py-2.5 text-right">Saldo</th>
-            <th className="px-2 py-2.5">Responsable</th><th className="px-2 py-2.5">Observación</th><th className="px-2 py-2.5">Fecha compra</th><th className="px-2 py-2.5">Acción</th>
-          </tr></thead>
+      <div className="w-full overflow-x-auto">
+        <table className="w-full table-fixed border-collapse text-left text-[10px] leading-tight">
+          <colgroup>
+            <col className="w-[8%]" />
+            <col className="w-[7%]" />
+            <col className="w-[7%]" />
+            <col className="w-[14%]" />
+            <col className="w-[8%]" />
+            <col className="w-[6%]" />
+            <col className="w-[8%]" />
+            <col className="w-[8%]" />
+            <col className="w-[6%]" />
+            <col className="w-[4%]" />
+            <col className="w-[5%]" />
+            <col className="w-[7%]" />
+            <col className="w-[7%]" />
+            <col className="w-[5%]" />
+          </colgroup>
+          <thead className="bg-[var(--navy)] text-[9px] font-bold uppercase leading-tight text-white">
+            <tr>
+              <th className="px-1.5 py-2">Lote</th>
+              <th className="px-1.5 py-2">Fecha envío</th>
+              <th className="px-1.5 py-2">SKU</th>
+              <th className="px-1.5 py-2">Descripción</th>
+              <th className="px-1.5 py-2">Marca</th>
+              <th className="px-1.5 py-2 text-right">Cant. solicitada</th>
+              <th className="px-1.5 py-2">Estado</th>
+              <th className="px-1.5 py-2">Proveedor</th>
+              <th className="px-1.5 py-2 text-right">Cant. comprada</th>
+              <th className="px-1.5 py-2 text-right">Saldo</th>
+              <th className="px-1.5 py-2">Responsable</th>
+              <th className="px-1.5 py-2">Observación</th>
+              <th className="px-1.5 py-2">Fecha compra</th>
+              <th className="px-1.5 py-2">Acción</th>
+            </tr>
+          </thead>
           <tbody className="divide-y divide-[var(--line)]">
             {visibles.length ? visibles.map((row, index) => <tr key={`${row.nroEnvio}-${row.sku}-${index}`} className={row.virtual ? "bg-amber-50/45" : "hover:bg-[var(--soft)]"}>
-              <th scope="row" className="whitespace-nowrap px-2 py-2 font-semibold text-[var(--navy)]">{row.nroEnvio}</th>
-              <td className="whitespace-nowrap px-2 py-2 tabular-nums">{row.fechaEnvio || "–"}</td><td className="px-2 py-2 font-semibold text-[var(--navy)]">{row.sku}</td><td className="max-w-72 px-2 py-2">{row.descripcion}</td><td className="px-2 py-2">{row.marca}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{number(row.cantidadSolicitada)}</td><td className="px-2 py-2"><Estado value={row.estadoCompra} /></td><td className="px-2 py-2">{row.proveedor || "–"}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{row.cantidadComprada > 0 ? number(row.cantidadComprada) : ""}</td><td className="px-2 py-2 text-right font-semibold tabular-nums">{number(row.saldoPendiente)}</td>
-              <td className="px-2 py-2">{row.responsableCompra || "–"}</td><td className="max-w-64 px-2 py-2 whitespace-pre-wrap">{row.observacionCompra}</td><td className="whitespace-nowrap px-2 py-2 tabular-nums">{row.fechaCompra || "–"}</td>
-              <td className="px-2 py-2"><button type="button" onClick={() => setSelected(row)} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--blue)] px-2.5 py-1.5 font-semibold text-[var(--blue)] hover:bg-[var(--navy-soft)]"><Eye aria-hidden="true" className="size-3.5" />Gestionar</button></td>
+              <th scope="row" className="break-words px-1.5 py-2 font-semibold text-[var(--navy)]">{row.nroEnvio}</th>
+              <td className="break-words px-1.5 py-2 tabular-nums">{row.fechaEnvio || "–"}</td>
+              <td className="break-words px-1.5 py-2 font-semibold text-[var(--navy)]">{row.sku}</td>
+              <td className="break-words px-1.5 py-2">{row.descripcion}</td>
+              <td className="break-words px-1.5 py-2">{row.marca}</td>
+              <td className="px-1.5 py-2 text-right tabular-nums">{number(row.cantidadSolicitada)}</td>
+              <td className="px-1.5 py-2"><Estado value={row.estadoCompra} /></td>
+              <td className="break-words px-1.5 py-2">{row.proveedor || "–"}</td>
+              <td className="px-1.5 py-2 text-right tabular-nums">{row.cantidadComprada > 0 ? number(row.cantidadComprada) : ""}</td>
+              <td className="px-1.5 py-2 text-right font-semibold tabular-nums">{number(row.saldoPendiente)}</td>
+              <td className="break-words px-1.5 py-2">{row.responsableCompra || "–"}</td>
+              <td className="whitespace-pre-wrap break-words px-1.5 py-2">{row.observacionCompra}</td>
+              <td className="break-words px-1.5 py-2 tabular-nums">{row.fechaCompra || "–"}</td>
+              <td className="px-1 py-2">
+                <button type="button" onClick={() => setSelected(row)} className="inline-flex w-full items-center justify-center gap-1 rounded-md border border-[var(--blue)] px-1.5 py-1 text-[9px] font-semibold text-[var(--blue)] hover:bg-[var(--navy-soft)]">
+                  <Eye aria-hidden="true" className="size-3" />Gestionar
+                </button>
+              </td>
             </tr>) : <tr><td colSpan={14} className="px-4 py-10 text-center text-[var(--muted)]">No hay compras que coincidan con los filtros seleccionados.</td></tr>}
           </tbody>
         </table>

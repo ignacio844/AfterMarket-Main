@@ -84,7 +84,7 @@ function exportCsv(registros: TransferenciaRegistro[]) {
 function DirectionBadge({ value }: { value: TransferenciaRegistro["direccion"] }) {
   const toWarnes = value === "ESCOBAR → WARNES";
   return (
-    <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold ${toWarnes ? "bg-blue-100 text-blue-800" : "bg-violet-100 text-violet-800"}`}>
+    <span className={`inline-flex whitespace-nowrap rounded-full px-1.5 py-0.5 text-[8px] font-bold leading-none ${toWarnes ? "bg-blue-100 text-blue-800" : "bg-violet-100 text-violet-800"}`}>
       {value}
     </span>
   );
@@ -106,11 +106,11 @@ function SortButton({
     <button
       type="button"
       onClick={() => onSort(sortKey)}
-      className="inline-flex items-center gap-1.5 whitespace-nowrap text-left font-bold uppercase tracking-[0.04em] text-white"
+      className="inline-flex w-full items-center justify-end gap-0.5 whitespace-normal text-right text-[7.5px] font-bold uppercase leading-tight tracking-normal text-white"
     >
       {label}
       {active ? (
-        sort.direction === "desc" ? <ArrowDown aria-hidden="true" className="size-3" /> : <ArrowUp aria-hidden="true" className="size-3" />
+        sort.direction === "desc" ? <ArrowDown aria-hidden="true" className="size-2.5 shrink-0" /> : <ArrowUp aria-hidden="true" className="size-2.5 shrink-0" />
       ) : null}
     </button>
   );
@@ -239,46 +239,62 @@ export function ComprasTransferenciasWorkspace({ data }: { data: ComprasTransfer
       </div>
 
       <section aria-label="Tabla de transferencias entre depósitos" className="overflow-hidden rounded-[22px] border border-[var(--line)] bg-white">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1720px] border-collapse text-left text-[11px]">
-            <thead className="bg-[var(--navy)] text-[10px] font-bold uppercase tracking-[0.04em] text-white">
+        <div className="w-full overflow-x-auto">
+          <table className="w-full table-fixed border-collapse text-left text-[9px] leading-tight">
+            <colgroup>
+              <col className="w-[8%]" />
+              <col className="w-[13%]" />
+              <col className="w-[9%]" />
+              <col className="w-[6.5%]" />
+              <col className="w-[6.5%]" />
+              <col className="w-[6.5%]" />
+              <col className="w-[5%]" />
+              <col className="w-[5%]" />
+              <col className="w-[10%]" />
+              <col className="w-[7%]" />
+              <col className="w-[5.5%]" />
+              <col className="w-[5.5%]" />
+              <col className="w-[6.25%]" />
+              <col className="w-[6.25%]" />
+            </colgroup>
+            <thead className="bg-[var(--navy)] text-[7.5px] font-bold uppercase leading-tight text-white">
               <tr>
-                <th className="px-3 py-3">SKU</th>
-                <th className="px-3 py-3">Descripción</th>
-                <th className="px-3 py-3">Marca</th>
-                <th className="px-3 py-3 text-right"><SortButton label="Stock Warnes" sortKey="stockWarnes" sort={sort} onSort={changeSort} /></th>
-                <th className="px-3 py-3 text-right"><SortButton label="Stock Escobar" sortKey="stockEscobar" sort={sort} onSort={changeSort} /></th>
-                <th className="px-3 py-3 text-right"><SortButton label="Stock total" sortKey="stockTotal" sort={sort} onSort={changeSort} /></th>
-                <th className="px-3 py-3 text-right"><SortButton label="% Warnes" sortKey="porcentajeWarnes" sort={sort} onSort={changeSort} /></th>
-                <th className="px-3 py-3 text-right"><SortButton label="% Escobar" sortKey="porcentajeEscobar" sort={sort} onSort={changeSort} /></th>
-                <th className="px-3 py-3">Dirección</th>
-                <th className="px-3 py-3 text-right"><SortButton label="Cant. transferir" sortKey="cantidadTransferir" sort={sort} onSort={changeSort} /></th>
-                <th className="px-3 py-3 text-right"><SortButton label="Warnes final" sortKey="warnesFinal" sort={sort} onSort={changeSort} /></th>
-                <th className="px-3 py-3 text-right"><SortButton label="Escobar final" sortKey="escobarFinal" sort={sort} onSort={changeSort} /></th>
-                <th className="px-3 py-3 text-right"><SortButton label="% Warnes final" sortKey="porcentajeWarnesFinal" sort={sort} onSort={changeSort} /></th>
-                <th className="px-3 py-3 text-right"><SortButton label="% Escobar final" sortKey="porcentajeEscobarFinal" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1.5 py-2">SKU</th>
+                <th className="px-1.5 py-2">Descripción</th>
+                <th className="px-1.5 py-2">Marca</th>
+                <th className="px-1 py-2 text-right"><SortButton label="Stock Warnes" sortKey="stockWarnes" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1 py-2 text-right"><SortButton label="Stock Escobar" sortKey="stockEscobar" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1 py-2 text-right"><SortButton label="Stock total" sortKey="stockTotal" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1 py-2 text-right"><SortButton label="% Warnes" sortKey="porcentajeWarnes" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1 py-2 text-right"><SortButton label="% Escobar" sortKey="porcentajeEscobar" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1.5 py-2">Dirección</th>
+                <th className="px-1 py-2 text-right"><SortButton label="Cant. transferir" sortKey="cantidadTransferir" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1 py-2 text-right"><SortButton label="Warnes final" sortKey="warnesFinal" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1 py-2 text-right"><SortButton label="Escobar final" sortKey="escobarFinal" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1 py-2 text-right"><SortButton label="% Warnes final" sortKey="porcentajeWarnesFinal" sort={sort} onSort={changeSort} /></th>
+                <th className="px-1 py-2 text-right"><SortButton label="% Escobar final" sortKey="porcentajeEscobarFinal" sort={sort} onSort={changeSort} /></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--line)]">
               {visibles.length ? visibles.map((row) => (
                 <tr key={row.sku} className={`${row.aproximado ? "bg-amber-50 hover:bg-amber-100/70" : "hover:bg-[var(--soft)]"}`}>
-                  <th scope="row" className="whitespace-nowrap px-3 py-3 font-semibold text-[var(--navy)]">{row.sku}</th>
-                  <td className="max-w-80 px-3 py-3">{row.descripcion || "–"}</td>
-                  <td className="px-3 py-3">{row.marca}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{number(row.stockWarnes)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{number(row.stockEscobar)}</td>
-                  <td className="px-3 py-3 text-right font-semibold tabular-nums text-[var(--navy)]">{number(row.stockTotal)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{percent(row.porcentajeWarnes)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{percent(row.porcentajeEscobar)}</td>
-                  <td className="px-3 py-3"><DirectionBadge value={row.direccion} /></td>
-                  <td className="px-3 py-3 text-right font-semibold tabular-nums text-[var(--navy)]">
+                  <th scope="row" className="break-words px-1.5 py-2 font-semibold text-[var(--navy)]">{row.sku}</th>
+                  <td className="break-words px-1.5 py-2">{row.descripcion || "–"}</td>
+                  <td className="break-words px-1.5 py-2">{row.marca}</td>
+                  <td className="px-1 py-2 text-right tabular-nums">{number(row.stockWarnes)}</td>
+                  <td className="px-1 py-2 text-right tabular-nums">{number(row.stockEscobar)}</td>
+                  <td className="px-1 py-2 text-right font-semibold tabular-nums text-[var(--navy)]">{number(row.stockTotal)}</td>
+                  <td className="px-1 py-2 text-right tabular-nums">{percent(row.porcentajeWarnes)}</td>
+                  <td className="px-1 py-2 text-right tabular-nums">{percent(row.porcentajeEscobar)}</td>
+                  <td className="px-1.5 py-2"><DirectionBadge value={row.direccion} /></td>
+                  <td className="px-1 py-2 text-right font-semibold tabular-nums text-[var(--navy)]">
                     <span>{number(row.cantidadTransferir)}</span>
-                    {row.aproximado && <span className="ml-2 inline-flex rounded-full bg-amber-200 px-2 py-0.5 text-[9px] font-bold text-amber-900">APROX.</span>}
+                    {row.aproximado && <span className="ml-1 inline-flex rounded-full bg-amber-200 px-1 py-0.5 text-[7px] font-bold text-amber-900">APROX.</span>}
                   </td>
-                  <td className="px-3 py-3 text-right tabular-nums">{number(row.warnesFinal)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{number(row.escobarFinal)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{percent(row.porcentajeWarnesFinal)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{percent(row.porcentajeEscobarFinal)}</td>
+                  <td className="px-1 py-2 text-right tabular-nums">{number(row.warnesFinal)}</td>
+                  <td className="px-1 py-2 text-right tabular-nums">{number(row.escobarFinal)}</td>
+                  <td className="px-1 py-2 text-right tabular-nums">{percent(row.porcentajeWarnesFinal)}</td>
+                  <td className="px-1 py-2 text-right tabular-nums">{percent(row.porcentajeEscobarFinal)}</td>
                 </tr>
               )) : (
                 <tr><td colSpan={14} className="px-5 py-12 text-center text-sm text-[var(--muted)]">No hay transferencias para los filtros seleccionados.</td></tr>

@@ -243,34 +243,138 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
       : `No se pudo cargar ${isHistorial ? "Historial SKU" : isGestion ? "Gestión de Compras" : isBandeja ? "Bandeja de Compra" : isProceso ? "Compras en Proceso" : isPacking ? "Packing List" : isContenedores ? "Contenedores" : isSeguimiento ? "Seguimiento" : isRecepciones ? "Recepciones" : isTransferencias ? "Transferencias" : isEnvios ? "Enviados a Compra" : isCotizaciones ? "Cotizaciones" : "el Dashboard de Compras"}.`;
   }
 
+  const isMoreView =
+    isRecepciones ||
+    isHistorial ||
+    isTransferencias;
+
   return (
     <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
       <main className={`mx-auto ${isWide ? "max-w-[1920px] px-4 py-5 lg:px-5 lg:py-6" : "max-w-[1440px] px-5 py-8 lg:px-10 lg:py-10"}`}>
-        <section className={`relative flex flex-wrap items-end justify-between gap-6 overflow-hidden bg-[var(--navy)] text-white shadow-[0_24px_60px_-36px_rgba(14,40,65,0.72)] ${isWide ? "min-h-32 rounded-[22px] px-6 py-5" : "min-h-48 rounded-[28px] px-7 py-8 sm:px-9"}`}>
-          <div aria-hidden="true" className="absolute -right-12 -top-24 size-72 rounded-full border border-white/10" />
-          <div aria-hidden="true" className="absolute right-24 top-20 size-36 rounded-full border border-white/10" />
-          <div className="relative z-10 max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/55">Abastecimiento · {isHistorial ? "Historial SKU" : isGestion ? "Gestión" : isBandeja ? "Bandeja de Compra" : isProceso ? "Compras en Proceso" : isPacking ? "Packing List" : isContenedores ? "Contenedores" : isSeguimiento ? "Seguimiento" : isRecepciones ? "Recepciones" : isTransferencias ? "Transferencias" : isEnvios ? "Enviados a Compra" : isCotizaciones ? "Cotizaciones" : "Dashboard"}</p>
-            <h1 className={`${isWide ? "mt-1 text-2xl sm:text-3xl" : "mt-3 text-3xl sm:text-4xl"} font-semibold tracking-[-0.04em]`}>Compras</h1>
-            <p className={`${isWide ? "mt-1" : "mt-3"} text-sm leading-6 text-white/60`}>{isHistorial ? "Trazabilidad de las decisiones y compras por SKU." : isGestion ? "Decisiones, riesgos y recomendaciones de compra por SKU, en modo consulta." : isBandeja ? "SKU aprobados y cantidades pendientes de enviar a compra." : isProceso ? "Seguimiento operativo de los SKU enviados a Compras." : isPacking ? "Seguimiento logístico de Packing List posterior a la compra." : isContenedores ? "Trazabilidad de Packing List asociados a contenedores y estado de embarque." : isSeguimiento ? "Vista gráfica del circuito logístico basada en ORDENES (STATUS + SITUACION)." : isRecepciones ? "Consulta de órdenes y líneas pendientes de recepción sobre DETALLE_IMPORTACIONES." : isTransferencias ? "Propuestas de redistribución de stock entre Warnes y Escobar según objetivo 10% / 90%." : isEnvios ? "Lotes enviados, cantidades y órdenes de compra asociadas." : isCotizaciones ? "Pendientes importados, lotes de cotización y ofertas de proveedores." : "Riesgos de stock, cobertura y recomendaciones de compra, consolidados por marca."}</p>
-          </div>
-          {!isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias && <p className="relative z-10 text-xs text-white/60">Actualizado: <span className="font-semibold text-white">{(isGestion ? gestion?.actualizado : dashboard?.actualizado) ?? "Sin datos"}</span></p>}
-        </section>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <nav
+            aria-label="Vistas de Compras"
+            className="mx-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-[var(--line)] bg-white p-1.5 shadow-sm"
+          >
+            <Link
+              href="/areas/compras"
+              prefetch={false}
+              aria-current={!isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${!isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+            >
+              Dashboard
+            </Link>
 
-        <div className={`${isWide ? "mt-3" : "mt-5"} flex flex-wrap items-center justify-between gap-3`}>
-          <nav aria-label="Vistas de Compras" className="inline-flex max-w-full overflow-x-auto rounded-2xl border border-[var(--line)] bg-white p-1">
-            <Link href="/areas/compras" prefetch={false} aria-current={!isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${!isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Dashboard</Link>
-            <Link href="/areas/compras?vista=gestion" prefetch={false} aria-current={isGestion ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isGestion ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Gestión de Compras</Link>
-            <Link href="/areas/compras?vista=cotizaciones" prefetch={false} aria-current={isCotizaciones ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isCotizaciones ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Cotizaciones</Link>
-            <Link href="/areas/compras?vista=bandeja" prefetch={false} aria-current={isBandeja ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isBandeja ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Bandeja de Compra</Link>
-            <Link href="/areas/compras?vista=envios" prefetch={false} aria-current={isEnvios ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isEnvios ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Enviados a Compra</Link>
-            <Link href="/areas/compras?vista=proceso" prefetch={false} aria-current={isProceso ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isProceso ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Compras en Proceso</Link>
-            <Link href="/areas/compras?vista=packing" prefetch={false} aria-current={isPacking ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isPacking ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Packing List</Link>
-            <Link href="/areas/compras?vista=contenedores" prefetch={false} aria-current={isContenedores ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isContenedores ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Contenedores</Link>
-            <Link href="/areas/compras?vista=seguimiento" prefetch={false} aria-current={isSeguimiento ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isSeguimiento ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Seguimiento</Link>
-            <Link href="/areas/compras?vista=recepciones" prefetch={false} aria-current={isRecepciones ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isRecepciones ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Recepciones</Link>
-            <Link href="/areas/compras?vista=historial" prefetch={false} aria-current={isHistorial ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isHistorial ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Historial SKU</Link>
-            <Link href="/areas/compras?vista=transferencias" prefetch={false} aria-current={isTransferencias ? "page" : undefined} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-xs font-semibold transition ${isTransferencias ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}>Transferencias</Link>
+            <Link
+              href="/areas/compras?vista=gestion"
+              prefetch={false}
+              aria-current={isGestion ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isGestion ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+            >
+              Gestión
+            </Link>
+
+            <Link
+              href="/areas/compras?vista=cotizaciones"
+              prefetch={false}
+              aria-current={isCotizaciones ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isCotizaciones ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+            >
+              Cotizaciones
+            </Link>
+
+            <Link
+              href="/areas/compras?vista=bandeja"
+              prefetch={false}
+              aria-current={isBandeja ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isBandeja ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+            >
+              Bandeja
+            </Link>
+
+            <Link
+              href="/areas/compras?vista=envios"
+              prefetch={false}
+              aria-current={isEnvios ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isEnvios ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+            >
+              Enviados
+            </Link>
+
+            <Link
+              href="/areas/compras?vista=proceso"
+              prefetch={false}
+              aria-current={isProceso ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isProceso ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+            >
+              En proceso
+            </Link>
+
+            <Link
+              href="/areas/compras?vista=packing"
+              prefetch={false}
+              aria-current={isPacking ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isPacking ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+            >
+              Packing List
+            </Link>
+
+            <Link
+              href="/areas/compras?vista=contenedores"
+              prefetch={false}
+              aria-current={isContenedores ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isContenedores ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+            >
+              Contenedores
+            </Link>
+
+            <Link
+              href="/areas/compras?vista=seguimiento"
+              prefetch={false}
+              aria-current={isSeguimiento ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isSeguimiento ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+            >
+              Seguimiento
+            </Link>
+
+            <details className="group relative">
+              <summary
+                className={`flex cursor-pointer list-none items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${
+                  isMoreView
+                    ? "bg-[var(--navy)] text-white"
+                    : "text-[var(--muted)] hover:bg-[var(--soft)]"
+                }`}
+              >
+                Más
+                <span aria-hidden="true" className="text-[10px] transition group-open:rotate-180">▼</span>
+              </summary>
+
+              <div className="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-2xl border border-[var(--line)] bg-white p-1.5 shadow-[0_18px_42px_-20px_rgba(14,40,65,0.45)]">
+                <Link
+                  href="/areas/compras?vista=recepciones"
+                  prefetch={false}
+                  className={`block rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isRecepciones ? "bg-[var(--navy)] text-white" : "text-[var(--ink)] hover:bg-[var(--soft)]"}`}
+                >
+                  Recepciones
+                </Link>
+
+                <Link
+                  href="/areas/compras?vista=historial"
+                  prefetch={false}
+                  className={`block rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isHistorial ? "bg-[var(--navy)] text-white" : "text-[var(--ink)] hover:bg-[var(--soft)]"}`}
+                >
+                  Historial SKU
+                </Link>
+
+                <Link
+                  href="/areas/compras?vista=transferencias"
+                  prefetch={false}
+                  className={`block rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isTransferencias ? "bg-[var(--navy)] text-white" : "text-[var(--ink)] hover:bg-[var(--soft)]"}`}
+                >
+                  Transferencias
+                </Link>
+              </div>
+            </details>
           </nav>
           {!isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias && <ComprasDashboardActions canExport={Boolean(dashboard) && !isGestion} />}
         </div>

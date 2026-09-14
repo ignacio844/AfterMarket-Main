@@ -40,29 +40,29 @@ function Card({ item, onOpen }: { item: SeguimientoRegistro; onOpen: (item: Segu
     <button
       type="button"
       onClick={() => onOpen(item)}
-      className={`w-full rounded-xl border border-[var(--line)] border-l-4 bg-white p-3 text-left shadow-[0_2px_8px_-6px_rgba(14,40,65,0.5)] transition hover:-translate-y-0.5 hover:shadow-md ${item.demora ? "border-l-red-600" : "border-l-emerald-600"}`}
+      className={`min-w-0 w-full rounded-xl border border-[var(--line)] border-l-4 bg-white p-2.5 text-left shadow-[0_2px_8px_-6px_rgba(14,40,65,0.5)] transition hover:-translate-y-0.5 hover:shadow-md ${item.demora ? "border-l-red-600" : "border-l-emerald-600"}`}
       title="Abrir detalle"
     >
       <span className="inline-flex rounded-full bg-[#e8eef5] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.06em] text-[#36536f]">
         {item.numero ? "CONTENEDOR" : "ORDEN / PL"}
       </span>
-      <p className="mt-1.5 text-sm font-bold text-[var(--navy)]">{title}</p>
+      <p className="mt-1.5 break-words text-[13px] font-bold leading-4 text-[var(--navy)]">{title}</p>
 
       {item.numero ? (
         <>
-          <p className="mt-1 text-[11px] leading-4 text-[var(--ink)]"><strong>Órdenes:</strong> {number(item.cantidadOrdenes)} · <strong>PL:</strong> {number(item.cantidadPackingLists)}</p>
-          {item.cantidadProveedores > 0 && <p className="text-[11px] leading-4 text-[var(--ink)]"><strong>Proveedores:</strong> {number(item.cantidadProveedores)}</p>}
+          <p className="mt-1 break-words text-[10px] leading-4 text-[var(--ink)]"><strong>Órdenes:</strong> {number(item.cantidadOrdenes)} · <strong>PL:</strong> {number(item.cantidadPackingLists)}</p>
+          {item.cantidadProveedores > 0 && <p className="break-words text-[10px] leading-4 text-[var(--ink)]"><strong>Proveedores:</strong> {number(item.cantidadProveedores)}</p>}
         </>
       ) : (
         <>
-          {item.pi && <p className="mt-1 text-[11px] leading-4 text-[var(--ink)]"><strong>Orden/PI:</strong> {orderPreview.slice(0, 2).join(", ")}{orderPreview.length > 2 ? ` +${orderPreview.length - 2}` : ""}</p>}
-          {item.proveedor && <p className="text-[11px] leading-4 text-[var(--ink)]"><strong>Proveedor:</strong> {providerPreview[0] || "-"}{providerPreview.length > 1 ? ` +${providerPreview.length - 1}` : ""}</p>}
+          {item.pi && <p className="mt-1 break-words text-[10px] leading-4 text-[var(--ink)]"><strong>Orden/PI:</strong> {orderPreview.slice(0, 2).join(", ")}{orderPreview.length > 2 ? ` +${orderPreview.length - 2}` : ""}</p>}
+          {item.proveedor && <p className="break-words text-[10px] leading-4 text-[var(--ink)]"><strong>Proveedor:</strong> {providerPreview[0] || "-"}{providerPreview.length > 1 ? ` +${providerPreview.length - 1}` : ""}</p>}
         </>
       )}
 
-      {item.eta && <p className="mt-1 text-[11px] leading-4 text-[var(--ink)]"><strong>ETA:</strong> {item.eta}</p>}
+      {item.eta && <p className="mt-1 break-words text-[10px] leading-4 text-[var(--ink)]"><strong>ETA:</strong> {item.eta}</p>}
       {item.unidades > 0 && <span className="mt-2 inline-flex rounded-full bg-[var(--soft)] px-2 py-0.5 text-[10px] text-[var(--muted)]">{number(item.unidades)} un.</span>}
-      <p className={`mt-1.5 text-[11px] font-bold ${item.demora ? "text-red-700" : "text-[var(--ink)]"}`}>
+      <p className={`mt-1.5 break-words text-[10px] font-bold leading-4 ${item.demora ? "text-red-700" : "text-[var(--ink)]"}`}>
         {hasDays ? `${item.diasEstado} día${item.diasEstado === 1 ? "" : "s"} en estado` : "Días en estado: —"}{item.demora ? " · DEMORADO" : ""}
       </p>
     </button>
@@ -198,17 +198,18 @@ export function ComprasSeguimientoWorkspace({ data }: { data: ComprasSeguimiento
         <button type="button" onClick={() => window.location.reload()} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--line)] bg-white px-3 py-2 font-semibold text-[var(--navy)] hover:bg-[var(--soft)]"><RefreshCw aria-hidden="true" className="size-3.5" />Actualizar</button>
       </div>
 
-      <div className="overflow-x-auto pb-2">
-        <div className="grid min-w-[1400px] grid-cols-5 gap-3 items-start">
+      <div className="w-full pb-2">
+        <div className="grid w-full grid-cols-1 items-start gap-2.5 md:grid-cols-2 xl:grid-cols-5">
           {SEGUIMIENTO_ESTADOS.map((estado) => {
             const registros = porEstado.get(estado) ?? [];
             return (
-              <section key={estado} className="min-h-[420px] overflow-hidden rounded-[18px] border border-[var(--line)] bg-[#eef2f5]">
-                <header className="flex items-center justify-between bg-[var(--navy)] px-4 py-3 text-xs font-bold text-white">
-                  <span>{estado}</span><span>{number(registros.length)}</span>
+              <section key={estado} className="min-w-0 min-h-[420px] overflow-hidden rounded-[18px] border border-[var(--line)] bg-[#eef2f5]">
+                <header className="flex min-w-0 items-center justify-between gap-2 bg-[var(--navy)] px-3 py-3 text-[11px] font-bold text-white">
+                  <span className="min-w-0 break-words leading-4">{estado}</span>
+                  <span className="shrink-0">{number(registros.length)}</span>
                 </header>
-                <div className="space-y-2.5 p-2.5">
-                  {registros.length ? registros.map((item, index) => <Card key={`${item.tipo}-${item.numero || item.idPl || item.pi}-${index}`} item={item} onOpen={setSelected} />) : <p className="px-2 py-8 text-center text-xs text-[var(--muted)]">Sin registros</p>}
+                <div className="space-y-2 p-2">
+                  {registros.length ? registros.map((item, index) => <Card key={`${item.tipo}-${item.numero || item.idPl || item.pi}-${index}`} item={item} onOpen={setSelected} />) : <p className="px-2 py-8 text-center text-[11px] text-[var(--muted)]">Sin registros</p>}
                 </div>
               </section>
             );
@@ -229,4 +230,3 @@ export function ComprasSeguimientoWorkspace({ data }: { data: ComprasSeguimiento
     </div>
   );
 }
-    

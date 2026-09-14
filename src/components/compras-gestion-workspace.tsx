@@ -1,9 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { filterGestion, summarizeGestion, type ComprasGestion, type GestionFilters, type GestionRegistro } from "@/lib/compras-gestion";
+import {
+  GESTION_ESTADOS,
+  filterGestion,
+  summarizeGestion,
+  type ComprasGestion,
+  type GestionFilters,
+  type GestionRegistro,
+} from "@/lib/compras-gestion";
 
 const PAGE_SIZE = 50;
 const blankFilters: GestionFilters = { texto: "", riesgo: "", estado: "", marca: "", politica: "" };
@@ -13,6 +20,58 @@ const whole = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
 
 function number(value: number) {
   return whole.format(Math.round(value || 0));
+}
+
+function csvCell(value: string | number | boolean) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadGestionCsv(registros: GestionRegistro[]) {
+  const headers = [
+    "SKU",
+    "DESCRIPCION",
+    "MARCA",
+    "ORIGEN",
+    "OBJETIVO",
+    "COBERTURA_ACTUAL",
+    "RIESGO",
+    "POLITICA",
+    "COMPRA_SUGERIDA",
+    "ESTADO_GESTION",
+    "CANTIDAD_DECIDIDA",
+    "RESPONSABLE",
+    "OBSERVACION",
+    "FECHA_DECISION",
+  ];
+
+  const rows = registros.map((r) => [
+    r.sku,
+    r.descripcion,
+    r.marca,
+    r.origen,
+    r.coberturaObjetivo,
+    r.coberturaActual,
+    r.riesgo,
+    r.compraHabilitada ? "COMPRAR" : "NO COMPRAR",
+    r.compraSugerida,
+    r.estadoGestion,
+    r.cantidadDecidida,
+    r.responsable,
+    r.observacion,
+    r.fechaDecision,
+  ]);
+
+  const content = `\uFEFF${[headers, ...rows].map((row) => row.map(csvCell).join(";")).join("\r\n")}`;
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `gestion_compras_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function Select({ label, value, options, placeholder, onChange }: {
@@ -49,13 +108,22 @@ export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<GestionRegistro | null>(null);
   const [draft, setDraft] = useState<GestionDraft>(blankDraft);
+  const [selectedSkus, setSelectedSkus] = useState<Set<string>>(() => new Set());
+  const [bulkState, setBulkState] = useState("");
+  const [bulkObservationEnabled, setBulkObservationEnabled] = useState(false);
+  const [bulkObservation, setBulkObservation] = useState("");
+  const [groupState, setGroupState] = useState("");
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const selectVisibleRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (selected && !dialog.open) dialog.showModal();
     if (!selected && dialog.open) dialog.close();
   }, [selected]);
+
   const openGestion = (registro: GestionRegistro) => {
     setDraft({
       estadoGestion: registro.estadoGestion || "PENDIENTE",
@@ -64,14 +132,17 @@ export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }
     });
     setSelected(registro);
   };
+
   const closeGestion = () => {
     dialogRef.current?.close();
     setSelected(null);
   };
+
   const setFilter = (key: keyof GestionFilters, value: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
     setPage(1);
   };
+
   const filtered = useMemo(() => filterGestion(gestion.registros, filters), [gestion.registros, filters]);
   const summary = useMemo(() => summarizeGestion(filtered), [filtered]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -80,8 +151,95 @@ export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }
   const visible = filtered.slice(start, start + PAGE_SIZE);
   const activeFilters = Object.values(filters).some(Boolean);
 
+  const selectedFilteredCount = useMemo(
+    () => filtered.reduce((total, registro) => total + (selectedSkus.has(registro.sku) ? 1 : 0), 0),
+    [filtered, selectedSkus],
+  );
+  const allFilteredSelected = filtered.length > 0 && selectedFilteredCount === filtered.length;
+
+  useEffect(() => {
+    if (!selectVisibleRef.current) return;
+    selectVisibleRef.current.indeterminate = selectedFilteredCount > 0 && selectedFilteredCount < filtered.length;
+  }, [filtered.length, selectedFilteredCount]);
+
+  const toggleRegistro = (sku: string, checked: boolean) => {
+    setSelectedSkus((current) => {
+      const next = new Set(current);
+      if (checked) next.add(sku);
+      else next.delete(sku);
+      return next;
+    });
+  };
+
+  const toggleFiltered = (checked: boolean) => {
+    setSelectedSkus((current) => {
+      const next = new Set(current);
+      filtered.forEach((registro) => {
+        if (checked) next.add(registro.sku);
+        else next.delete(registro.sku);
+      });
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedSkus(new Set());
+
+  const updateQuantityDraft = (registro: GestionRegistro, value: string) => {
+    const original = registro.cantidadDecidida > 0 ? String(registro.cantidadDecidida) : "";
+    setQuantityDrafts((current) => {
+      const next = { ...current };
+      if (value === original) delete next[registro.sku];
+      else next[registro.sku] = value;
+      return next;
+    });
+  };
+
+  const changedQuantities = Object.keys(quantityDrafts).length;
+
   return (
     <div className="mt-3 space-y-3">
+      <section className="rounded-[18px] border border-[var(--line)] bg-white px-4 py-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-[-0.025em] text-[var(--navy)]">Gestión de Compras</h2>
+            <p className="mt-1 text-xs text-[var(--muted)]">Actualizado: {gestion.actualizado || "Sin datos"}</p>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex min-w-[205px] flex-col gap-1 text-[11px] font-semibold text-[var(--muted)]">
+              Estado del grupo
+              <select
+                value={groupState}
+                onChange={(event) => setGroupState(event.target.value)}
+                className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
+              >
+                <option value="">Mantener estado actual</option>
+                {GESTION_ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
+              </select>
+            </label>
+
+            <button
+              type="button"
+              disabled
+              title="Se habilitará en la etapa 2, cuando activemos escrituras sobre Google Sheets."
+              className="h-10 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white opacity-55 disabled:cursor-not-allowed"
+            >
+              Guardar cantidades ({number(changedQuantities)})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => downloadGestionCsv(filtered)}
+              disabled={filtered.length === 0}
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--blue)] bg-white px-4 text-xs font-semibold text-[var(--blue)] transition hover:bg-[var(--navy-soft)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Download aria-hidden="true" className="size-4" />
+              Descargar registros
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section className="rounded-[18px] border border-[var(--line)] bg-white p-4" aria-labelledby="gestion-filtros-title">
         <div className="mb-3 flex items-center gap-2 text-[var(--navy)]">
           <SlidersHorizontal aria-hidden="true" className="size-4" />
@@ -112,6 +270,82 @@ export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }
         </div>
       </section>
 
+      <section className="rounded-[18px] border border-[#c9deea] bg-[#f2f8fc] px-4 py-3" aria-label="Gestión masiva">
+        <div className="grid gap-3 lg:grid-cols-[auto_auto_minmax(220px,1fr)_minmax(260px,1fr)_auto] lg:items-end">
+          <label className="flex h-10 items-center gap-2 text-xs font-medium text-[var(--navy)]">
+            <input
+              ref={selectVisibleRef}
+              type="checkbox"
+              checked={allFilteredSelected}
+              onChange={(event) => toggleFiltered(event.target.checked)}
+              className="size-4 rounded border-[var(--line)] accent-[var(--navy)]"
+            />
+            Seleccionar visibles
+          </label>
+
+          <div className="flex h-10 items-center text-sm font-semibold text-[var(--navy)]">
+            {number(selectedSkus.size)} seleccionados
+          </div>
+
+          <label className="flex min-w-0 flex-col gap-1 text-[11px] font-semibold text-[var(--muted)]">
+            Estado para seleccionados
+            <select
+              value={bulkState}
+              onChange={(event) => setBulkState(event.target.value)}
+              className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
+            >
+              <option value="">Elegir estado…</option>
+              {GESTION_ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
+            </select>
+          </label>
+
+          <label className="flex min-w-0 flex-col gap-1 text-[11px] font-semibold text-[var(--muted)]">
+            Observación común
+            <span className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={bulkObservationEnabled}
+                onChange={(event) => {
+                  setBulkObservationEnabled(event.target.checked);
+                  if (!event.target.checked) setBulkObservation("");
+                }}
+                className="size-4 shrink-0 rounded border-[var(--line)] accent-[var(--navy)]"
+                title="Marcar para reemplazar la observación de todos los SKU seleccionados"
+              />
+              <input
+                type="text"
+                maxLength={1000}
+                value={bulkObservation}
+                disabled={!bulkObservationEnabled}
+                onChange={(event) => setBulkObservation(event.target.value)}
+                placeholder="Opcional"
+                className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15 disabled:bg-slate-50 disabled:text-slate-400"
+              />
+            </span>
+          </label>
+
+          <div className="flex h-10 items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={clearSelection}
+              disabled={selectedSkus.size === 0}
+              className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-semibold text-[var(--navy)] transition hover:bg-[var(--soft)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Quitar selección
+            </button>
+            <button
+              type="button"
+              disabled
+              title="Se habilitará en la etapa 2, cuando activemos escrituras sobre Google Sheets."
+              className="h-10 rounded-xl bg-purple-600 px-4 text-xs font-semibold text-white opacity-55 disabled:cursor-not-allowed"
+            >
+              Aplicar
+            </button>
+          </div>
+        </div>
+        <p className="mt-2 text-[10px] text-[var(--muted)]">La selección, los filtros y la edición local funcionan. Guardar cantidades y aplicar cambios masivos se habilitarán en la etapa 2.</p>
+      </section>
+
       <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" aria-label="Resumen de registros filtrados">
         {[
           { label: "Registros", value: summary.total },
@@ -129,18 +363,19 @@ export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }
       <section className="overflow-hidden rounded-[18px] border border-[var(--line)] bg-white" aria-labelledby="gestion-tabla-title">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Solo lectura</p>
-            <h2 id="gestion-tabla-title" className="mt-0.5 text-base font-semibold tracking-[-0.025em] text-[var(--navy)]">Gestión de Compras</h2>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Consulta activa</p>
+            <h2 id="gestion-tabla-title" className="mt-0.5 text-base font-semibold tracking-[-0.025em] text-[var(--navy)]">Registros de gestión</h2>
           </div>
           <span className="rounded-full bg-[var(--soft)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)]">{number(filtered.length)} resultados</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px] table-fixed border-collapse text-left text-[10px] leading-[1.25]">
+          <table className="w-full min-w-[1320px] table-fixed border-collapse text-left text-[10px] leading-[1.25]">
             <colgroup>
-              {[9, 11, 7, 6, 4, 7, 6, 6, 7, 7, 6, 6, 6, 6, 6].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}
+              {[3, 9, 11, 7, 6, 4, 7, 6, 6, 7, 7, 6, 6, 6, 6, 6].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}
             </colgroup>
             <thead className="bg-[var(--soft)] text-[9px] font-bold uppercase tracking-normal text-[var(--muted)]">
               <tr>
+                <th scope="col" className="px-1.5 py-2 text-center">✓</th>
                 <th scope="col" className="px-1.5 py-2">SKU</th>
                 <th scope="col" className="px-1.5 py-2">Descripción</th>
                 <th scope="col" className="px-1.5 py-2">Marca</th>
@@ -159,31 +394,54 @@ export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--line)]">
-              {visible.length ? visible.map((r, index) => (
-                <tr key={`${r.sku}-${start + index}`} className="hover:bg-[#f8fafb]">
-                  <th scope="row" className="break-all px-1.5 py-2 font-medium text-[var(--ink)]">{r.sku}</th>
-                  <td className="break-words px-1.5 py-2">{r.descripcion || "—"}</td>
-                  <td className="break-words px-1.5 py-2">{r.marca}</td>
-                  <td className="break-words px-1.5 py-2">{r.origen}</td>
-                  <td className="px-1.5 py-2 text-right tabular-nums">{r.coberturaObjetivo > 0 ? r.coberturaObjetivo.toFixed(1) : "—"}</td>
-                  <td className="px-1.5 py-2 text-right tabular-nums">{r.coberturaActual.toFixed(2)} meses</td>
-                  <td className="px-1.5 py-2"><Risk value={r.riesgo} /></td>
-                  <td className="px-1.5 py-2"><span className={`rounded-full px-1 py-0.5 text-[8px] font-bold whitespace-nowrap ${r.compraHabilitada ? "bg-sky-50 text-sky-800" : "bg-slate-100 text-slate-600"}`}>{r.compraHabilitada ? "COMPRAR" : "NO COMPRAR"}</span></td>
-                  <td className="px-1.5 py-2 text-right tabular-nums">{number(r.compraSugerida)}</td>
-                  <td className="break-words px-1.5 py-2">{r.estadoGestion}</td>
-                  <td className="px-1.5 py-2 text-right tabular-nums">{r.cantidadDecidida > 0 ? number(r.cantidadDecidida) : "—"}</td>
-                  <td className="break-words px-1.5 py-2">{r.responsable || "—"}</td>
-                  <td className="break-words px-1.5 py-2">{r.observacion || "—"}</td>
-                  <td className="break-words px-1.5 py-2">{r.fechaDecision || "—"}</td>
-                  <td className="px-1.5 py-1.5">
-                    <span className="flex flex-col gap-1">
-                      <button type="button" onClick={() => openGestion(r)} aria-label={`Gestionar ${r.sku}`} className="w-full rounded bg-[var(--navy)] px-1 py-0.5 text-[9px] font-semibold text-white transition hover:bg-[var(--blue)]">Gestionar</button>
-                      <Link href={{ pathname: "/areas/compras", query: { vista: "historial", sku: r.sku } }} prefetch={false} aria-label={`Ver historial de ${r.sku}`} className="w-full rounded border border-[var(--blue)] px-1 py-0.5 text-center text-[9px] font-semibold text-[var(--blue)] transition hover:bg-[var(--navy-soft)]">Historial</Link>
-                    </span>
-                  </td>
-                </tr>
-              )) : (
-                <tr><td colSpan={15} className="px-5 py-12 text-center text-sm text-[var(--muted)]">No existen registros para los filtros seleccionados.</td></tr>
+              {visible.length ? visible.map((r, index) => {
+                const quantityValue = quantityDrafts[r.sku] ?? (r.cantidadDecidida > 0 ? String(r.cantidadDecidida) : "");
+                const quantityChanged = Object.prototype.hasOwnProperty.call(quantityDrafts, r.sku);
+                return (
+                  <tr key={`${r.sku}-${start + index}`} className={selectedSkus.has(r.sku) ? "bg-sky-50/55 hover:bg-sky-50" : "hover:bg-[#f8fafb]"}>
+                    <td className="px-1.5 py-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedSkus.has(r.sku)}
+                        onChange={(event) => toggleRegistro(r.sku, event.target.checked)}
+                        aria-label={`Seleccionar ${r.sku}`}
+                        className="size-4 rounded border-[var(--line)] accent-[var(--navy)]"
+                      />
+                    </td>
+                    <th scope="row" className="break-all px-1.5 py-2 font-medium text-[var(--ink)]">{r.sku}</th>
+                    <td className="break-words px-1.5 py-2">{r.descripcion || "—"}</td>
+                    <td className="break-words px-1.5 py-2">{r.marca}</td>
+                    <td className="break-words px-1.5 py-2">{r.origen}</td>
+                    <td className="px-1.5 py-2 text-right tabular-nums">{r.coberturaObjetivo > 0 ? r.coberturaObjetivo.toFixed(1) : "—"}</td>
+                    <td className="px-1.5 py-2 text-right tabular-nums">{r.coberturaActual.toFixed(2)} meses</td>
+                    <td className="px-1.5 py-2"><Risk value={r.riesgo} /></td>
+                    <td className="px-1.5 py-2"><span className={`rounded-full px-1 py-0.5 text-[8px] font-bold whitespace-nowrap ${r.compraHabilitada ? "bg-sky-50 text-sky-800" : "bg-slate-100 text-slate-600"}`}>{r.compraHabilitada ? "COMPRAR" : "NO COMPRAR"}</span></td>
+                    <td className="px-1.5 py-2 text-right tabular-nums">{number(r.compraSugerida)}</td>
+                    <td className="break-words px-1.5 py-2">{r.estadoGestion}</td>
+                    <td className="px-1.5 py-1.5 text-right">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={quantityValue}
+                        onChange={(event) => updateQuantityDraft(r, event.target.value)}
+                        aria-label={`Cantidad decidida para ${r.sku}`}
+                        className={`h-8 w-full min-w-[72px] rounded-lg border px-2 text-right text-[10px] font-medium tabular-nums outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15 ${quantityChanged ? "border-amber-400 bg-amber-50" : "border-[var(--line)] bg-white"}`}
+                      />
+                    </td>
+                    <td className="break-words px-1.5 py-2">{r.responsable || "—"}</td>
+                    <td className="break-words px-1.5 py-2">{r.observacion || "—"}</td>
+                    <td className="break-words px-1.5 py-2">{r.fechaDecision || "—"}</td>
+                    <td className="px-1.5 py-1.5">
+                      <span className="flex flex-col gap-1">
+                        <button type="button" onClick={() => openGestion(r)} aria-label={`Gestionar ${r.sku}`} className="w-full rounded bg-[var(--navy)] px-1 py-0.5 text-[9px] font-semibold text-white transition hover:bg-[var(--blue)]">Gestionar</button>
+                        <Link href={{ pathname: "/areas/compras", query: { vista: "historial", sku: r.sku } }} prefetch={false} aria-label={`Ver historial de ${r.sku}`} className="w-full rounded border border-[var(--blue)] px-1 py-0.5 text-center text-[9px] font-semibold text-[var(--blue)] transition hover:bg-[var(--navy-soft)]">Historial</Link>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr><td colSpan={16} className="px-5 py-12 text-center text-sm text-[var(--muted)]">No existen registros para los filtros seleccionados.</td></tr>
               )}
             </tbody>
           </table>
@@ -251,7 +509,7 @@ export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }
               <p className="mb-3 text-xs text-[var(--muted)]">Este es un prototipo. Los cambios se descartan al cerrar y no llegan a Google Sheets.</p>
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={closeGestion} className="rounded-xl border border-[var(--line)] px-4 py-2.5 text-xs font-semibold text-[var(--navy)] transition hover:bg-[var(--soft)]">Cerrar sin guardar</button>
-                <button type="button" disabled title="La persistencia se implementará en una etapa posterior." className="rounded-xl bg-[var(--navy)] px-4 py-2.5 text-xs font-semibold text-white opacity-50 disabled:cursor-not-allowed">Guardar</button>
+                <button type="button" disabled title="La persistencia se implementará en la etapa 2." className="rounded-xl bg-[var(--navy)] px-4 py-2.5 text-xs font-semibold text-white opacity-50 disabled:cursor-not-allowed">Guardar</button>
               </div>
             </div>
           </div>

@@ -21,7 +21,7 @@ function Estado({ value }: { value: string }) {
         : estado === "A EMBARCAR"
           ? "bg-amber-100 text-amber-800"
           : "bg-slate-100 text-slate-700";
-  return <span className={`whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-semibold ${tone}`}>{value || "EN FÁBRICA"}</span>;
+  return <span className={`inline-flex whitespace-nowrap rounded-full px-1 py-0.5 text-[8px] font-semibold leading-none ${tone}`}>{value || "EN FÁBRICA"}</span>;
 }
 
 function exportCsv(registros: PackingRegistro[]) {
@@ -113,20 +113,73 @@ export function ComprasPackingWorkspace({ data }: { data: ComprasPacking }) {
     </div>
 
     <section aria-label="Tabla de Packing List" className="overflow-hidden rounded-[22px] border border-[var(--line)] bg-white">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[2200px] border-collapse text-left text-[11px]">
-          <thead className="bg-[var(--navy)] text-[10px] font-bold uppercase text-white"><tr>
-            <th className="px-2 py-2.5">ID PL</th><th className="px-2 py-2.5">PI</th><th className="px-2 py-2.5">OC proveedor</th><th className="px-2 py-2.5">OC interna</th><th className="px-2 py-2.5">Proveedor</th>
-            <th className="px-2 py-2.5">Estado PL</th><th className="px-2 py-2.5">Estado ítem</th><th className="px-2 py-2.5">SKU</th><th className="px-2 py-2.5">Descripción</th>
-            <th className="px-2 py-2.5 text-right">Cant. comprada</th><th className="px-2 py-2.5 text-right">Cant. PL</th><th className="px-2 py-2.5 text-right">Diferencia</th><th className="px-2 py-2.5">Unidad</th>
-            <th className="px-2 py-2.5 text-right">Qty/caja</th><th className="px-2 py-2.5 text-right">Cajas</th><th className="px-2 py-2.5">Rango cajas</th><th className="px-2 py-2.5 text-right">Peso bruto</th><th className="px-2 py-2.5 text-right">Peso neto</th><th className="px-2 py-2.5 text-right">CBM total</th>
-          </tr></thead>
+      <div className="w-full overflow-x-auto">
+        <table className="w-full table-fixed border-collapse text-left text-[8.5px] leading-[1.15]">
+          <colgroup>
+            <col className="w-[6.7%]" />
+            <col className="w-[4.8%]" />
+            <col className="w-[5.3%]" />
+            <col className="w-[4.8%]" />
+            <col className="w-[8.6%]" />
+            <col className="w-[5.3%]" />
+            <col className="w-[5.3%]" />
+            <col className="w-[6.7%]" />
+            <col className="w-[12.4%]" />
+            <col className="w-[4.8%]" />
+            <col className="w-[4.3%]" />
+            <col className="w-[4.3%]" />
+            <col className="w-[3.3%]" />
+            <col className="w-[3.8%]" />
+            <col className="w-[3.3%]" />
+            <col className="w-[4.8%]" />
+            <col className="w-[3.8%]" />
+            <col className="w-[3.8%]" />
+            <col className="w-[3.8%]" />
+          </colgroup>
+          <thead className="bg-[var(--navy)] text-[7.5px] font-bold uppercase leading-tight text-white">
+            <tr>
+              <th className="px-1 py-2">ID PL</th>
+              <th className="px-1 py-2">PI</th>
+              <th className="px-1 py-2">OC proveedor</th>
+              <th className="px-1 py-2">OC interna</th>
+              <th className="px-1 py-2">Proveedor</th>
+              <th className="px-1 py-2">Estado PL</th>
+              <th className="px-1 py-2">Estado ítem</th>
+              <th className="px-1 py-2">SKU</th>
+              <th className="px-1 py-2">Descripción</th>
+              <th className="px-1 py-2 text-right">Cant. comprada</th>
+              <th className="px-1 py-2 text-right">Cant. PL</th>
+              <th className="px-1 py-2 text-right">Diferencia</th>
+              <th className="px-1 py-2">Unidad</th>
+              <th className="px-1 py-2 text-right">Qty/caja</th>
+              <th className="px-1 py-2 text-right">Cajas</th>
+              <th className="px-1 py-2">Rango cajas</th>
+              <th className="px-1 py-2 text-right">Peso bruto</th>
+              <th className="px-1 py-2 text-right">Peso neto</th>
+              <th className="px-1 py-2 text-right">CBM total</th>
+            </tr>
+          </thead>
           <tbody className="divide-y divide-[var(--line)]">
             {visibles.length ? visibles.map((row, index) => <tr key={`${row.idPl}-${row.sku}-${index}`} className="hover:bg-[var(--soft)]">
-              <th scope="row" className="whitespace-nowrap px-2 py-2 font-semibold text-[var(--navy)]">{row.idPl}</th><td className="whitespace-nowrap px-2 py-2">{row.pi || "–"}</td><td className="whitespace-nowrap px-2 py-2">{row.ocProveedor || "–"}</td><td className="whitespace-nowrap px-2 py-2">{row.ocInterna || "–"}</td><td className="px-2 py-2">{row.proveedor || "–"}</td>
-              <td className="px-2 py-2"><Estado value={row.estadoPl} /></td><td className="px-2 py-2"><Estado value={row.estadoItem} /></td><td className="px-2 py-2 font-semibold text-[var(--navy)]">{row.sku}</td><td className="max-w-80 px-2 py-2">{row.descripcion}</td>
-              <td className="px-2 py-2 text-right tabular-nums">{row.cantidadComprada ? number(row.cantidadComprada) : ""}</td><td className="px-2 py-2 text-right font-semibold tabular-nums">{number(row.cantidadPl)}</td><td className={`px-2 py-2 text-right font-semibold tabular-nums ${row.diferencia < 0 ? "text-red-700" : row.diferencia > 0 ? "text-emerald-700" : ""}`}>{row.diferencia ? number(row.diferencia) : "0"}</td>
-              <td className="px-2 py-2">{row.unidad || "–"}</td><td className="px-2 py-2 text-right tabular-nums">{number(row.qtyCaja)}</td><td className="px-2 py-2 text-right tabular-nums">{number(row.cajas)}</td><td className="px-2 py-2">{row.rangoCajas || "–"}</td><td className="px-2 py-2 text-right tabular-nums">{decimal(row.pesoBruto, 2)}</td><td className="px-2 py-2 text-right tabular-nums">{decimal(row.pesoNeto, 2)}</td><td className="px-2 py-2 text-right tabular-nums">{decimal(row.cbmTotal, 3)}</td>
+              <th scope="row" className="break-words px-1 py-2 font-semibold text-[var(--navy)]">{row.idPl}</th>
+              <td className="break-words px-1 py-2">{row.pi || "–"}</td>
+              <td className="break-words px-1 py-2">{row.ocProveedor || "–"}</td>
+              <td className="break-words px-1 py-2">{row.ocInterna || "–"}</td>
+              <td className="break-words px-1 py-2">{row.proveedor || "–"}</td>
+              <td className="px-1 py-2"><Estado value={row.estadoPl} /></td>
+              <td className="px-1 py-2"><Estado value={row.estadoItem} /></td>
+              <td className="break-words px-1 py-2 font-semibold text-[var(--navy)]">{row.sku}</td>
+              <td className="break-words px-1 py-2">{row.descripcion}</td>
+              <td className="px-1 py-2 text-right tabular-nums">{row.cantidadComprada ? number(row.cantidadComprada) : ""}</td>
+              <td className="px-1 py-2 text-right font-semibold tabular-nums">{number(row.cantidadPl)}</td>
+              <td className={`px-1 py-2 text-right font-semibold tabular-nums ${row.diferencia < 0 ? "text-red-700" : row.diferencia > 0 ? "text-emerald-700" : ""}`}>{row.diferencia ? number(row.diferencia) : "0"}</td>
+              <td className="break-words px-1 py-2">{row.unidad || "–"}</td>
+              <td className="px-1 py-2 text-right tabular-nums">{number(row.qtyCaja)}</td>
+              <td className="px-1 py-2 text-right tabular-nums">{number(row.cajas)}</td>
+              <td className="break-words px-1 py-2">{row.rangoCajas || "–"}</td>
+              <td className="px-1 py-2 text-right tabular-nums">{decimal(row.pesoBruto, 2)}</td>
+              <td className="px-1 py-2 text-right tabular-nums">{decimal(row.pesoNeto, 2)}</td>
+              <td className="px-1 py-2 text-right tabular-nums">{decimal(row.cbmTotal, 3)}</td>
             </tr>) : <tr><td colSpan={19} className="px-4 py-10 text-center text-[var(--muted)]">Todavía no hay líneas de Packing List que coincidan con los filtros seleccionados.</td></tr>}
           </tbody>
         </table>
