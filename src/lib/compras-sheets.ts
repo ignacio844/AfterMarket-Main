@@ -9,6 +9,12 @@ import { calculateComprasHistorial, type ComprasHistorial } from "@/lib/compras-
 import { calculateComprasEnvios, type ComprasEnvios } from "@/lib/compras-envios";
 import { calculateComprasCotizaciones, type ComprasCotizaciones } from "@/lib/compras-cotizaciones";
 import { calculateComprasBandeja, type ComprasBandeja } from "@/lib/compras-bandeja";
+import { calculateComprasProceso, type ComprasProceso } from "@/lib/compras-proceso";
+import { calculateComprasPacking, type ComprasPacking } from "@/lib/compras-packing";
+import { calculateComprasContenedores, type ComprasContenedores } from "@/lib/compras-contenedores";
+import { calculateComprasSeguimiento, type ComprasSeguimiento } from "@/lib/compras-seguimiento";
+import { calculateComprasRecepciones, type ComprasRecepciones } from "@/lib/compras-recepciones";
+import { calculateComprasTransferencias, type ComprasTransferencias } from "@/lib/compras-transferencias";
 
 const READ_ONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEET_NAMES = {
@@ -26,6 +32,13 @@ const SHEET_NAMES = {
   ordenesCompra: "ORDENES_COMPRA_PORTAL",
   cotizaciones: "COTIZACIONES_COMPRA",
   ofertas: "COTIZACIONES_OFERTAS",
+  packingList: "PACKING_LIST",
+  packingListDetalle: "PACKING_LIST_DETALLE",
+  contenedores: "CONTENEDORES",
+  contenedorPacking: "CONTENEDOR_PACKING_LIST",
+  ordenes: "ORDENES",
+  historialLogistica: "HISTORIAL_ESTADOS_LOGISTICA",
+  detalleImportaciones: "DETALLE_IMPORTACIONES",
 } as const;
 
 type SheetMetadata = { properties?: { timeZone?: string }; sheets?: Array<{ properties?: { title?: string } }> };
@@ -149,4 +162,57 @@ export async function getComprasBandeja(): Promise<ComprasBandeja> {
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
   const { sheets, timeZone } = await readSheets(["gestion", "cotizaciones", "ofertas"], "gestion");
   return calculateComprasBandeja(sheets, timeZone);
+}
+
+export async function getComprasProceso(): Promise<ComprasProceso> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets, timeZone } = await readSheets(["procesoCompra", "enviosCompra", "movimientosCompra"], "enviosCompra");
+  return calculateComprasProceso(sheets, new Date(), timeZone);
+}
+
+
+export async function getComprasPacking(): Promise<ComprasPacking> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets, timeZone } = await readSheets(["packingList", "packingListDetalle"], "packingList");
+  return calculateComprasPacking(sheets, new Date(), timeZone);
+}
+
+
+export async function getComprasContenedores(): Promise<ComprasContenedores> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets, timeZone } = await readSheets(["contenedores", "contenedorPacking", "packingList"], "contenedores");
+  return calculateComprasContenedores(sheets, new Date(), timeZone);
+}
+
+
+export async function getComprasSeguimiento(): Promise<ComprasSeguimiento> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets, timeZone } = await readSheets(["ordenes", "historialLogistica", "packingListDetalle"], "ordenes");
+  return calculateComprasSeguimiento(sheets, new Date(), timeZone);
+}
+
+
+export async function getComprasRecepciones(): Promise<ComprasRecepciones> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets } = await readSheets(["ordenes", "detalleImportaciones"], "ordenes");
+  return calculateComprasRecepciones(sheets, new Date());
+}
+
+
+export async function getComprasTransferencias(): Promise<ComprasTransferencias> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets } = await readSheets(["gestion"], "gestion");
+  return calculateComprasTransferencias(sheets, new Date());
 }
