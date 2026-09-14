@@ -8,6 +8,7 @@ import { calculateComprasGestion, type ComprasGestion } from "@/lib/compras-gest
 import { calculateComprasHistorial, type ComprasHistorial } from "@/lib/compras-historial";
 import { calculateComprasEnvios, type ComprasEnvios } from "@/lib/compras-envios";
 import { calculateComprasCotizaciones, type ComprasCotizaciones } from "@/lib/compras-cotizaciones";
+import { calculateComprasBandeja, type ComprasBandeja } from "@/lib/compras-bandeja";
 
 const READ_ONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEET_NAMES = {
@@ -140,4 +141,12 @@ export async function getComprasCotizaciones(): Promise<ComprasCotizaciones> {
     "gestion",
   );
   return calculateComprasCotizaciones(sheets, timeZone);
+}
+
+export async function getComprasBandeja(): Promise<ComprasBandeja> {
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets, timeZone } = await readSheets(["gestion", "cotizaciones", "ofertas"], "gestion");
+  return calculateComprasBandeja(sheets, timeZone);
 }
