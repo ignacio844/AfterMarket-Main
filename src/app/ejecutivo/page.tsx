@@ -61,10 +61,9 @@ export default async function EjecutivoPage() {
             <path className="executive-silver-line executive-silver-line-bright" d="M328 220c49-45 105-68 165-63 90 8 158-31 267-132" />
           </svg>
           <div className="relative z-10 max-w-3xl">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/55">Vista ejecutiva</p>
-            <h1 className="mt-4 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Ejecutivo</h1>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">Ejecutivo</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55">
-              Nueva sección preparada para incorporar la información y las herramientas del espacio ejecutivo.
+              Indicadores y herramientas clave para acompañar la toma de decisiones del equipo directivo.
             </p>
           </div>
         </section>

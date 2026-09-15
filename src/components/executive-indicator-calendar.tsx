@@ -280,6 +280,19 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
 
   const metrics = useMemo(() => new Map(data?.days.map((metric) => [metric.date, metric]) ?? []), [data]);
   const weekMetrics = useMemo(() => new Map(weekData?.days.map((metric) => [metric.date, metric]) ?? []), [weekData]);
+  const monthlySummary = useMemo(() => {
+    if (!data) return null;
+
+    const lines = data.days.reduce((total, metric) => total + metric.lines, 0);
+    const orders = data.days.reduce((total, metric) => total + metric.orders, 0);
+
+    return {
+      lines,
+      orders,
+      averageLines: data.averageLines,
+      linesPerOrder: orders > 0 ? lines / orders : 0,
+    };
+  }, [data]);
   const selected = date ? metrics.get(dateKey(date)) : undefined;
   const selectedLabel = date ? new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date) : null;
   const updatedAt = trendData?.updatedAt ?? data?.updatedAt;
@@ -310,16 +323,37 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
   return (
     <section className="mt-5 w-full" aria-labelledby="executive-indicators-title">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3 px-1">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-[var(--blue)]">Información central</p>
-          <h2 id="executive-indicators-title" className="mt-1 text-xl font-semibold tracking-[-0.025em] text-[var(--navy)]">Indicadores ejecutivos</h2>
-        </div>
+        <h2 id="executive-indicators-title" className="text-xl font-semibold tracking-[-0.025em] text-[var(--navy)]">Indicadores de negocio</h2>
         <span className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">{updatedLabel ? `Última actualización · ${updatedLabel}` : requestState === "loading" ? "Leyendo última actualización" : "Actualización no disponible"}</span>
       </div>
 
-      <article className="rounded-[24px] border border-[var(--line)] bg-white p-4 shadow-[0_18px_48px_-40px_rgba(14,40,65,0.5)] sm:p-5">
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.85fr)]">
-          <div className="min-w-0 lg:pr-1">
+      <div className="space-y-[7px]">
+        <article className="rounded-[24px] border border-[var(--line)] bg-white p-4 shadow-[0_18px_48px_-40px_rgba(14,40,65,0.5)] sm:p-5" aria-label="Resumen del mes visible">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { label: "Líneas del mes", value: monthlySummary?.lines.toLocaleString("es-AR"), background: "#174d70", border: "#174d70", labelColor: "#cfe5f1", valueColor: "#ffffff", dot: "#8bc3df" },
+              { label: "Pedidos del mes", value: monthlySummary?.orders.toLocaleString("es-AR"), background: "#34779f", border: "#34779f", labelColor: "#e1eff6", valueColor: "#ffffff", dot: "#b9dbea" },
+              { label: "Promedio diario", value: monthlySummary?.averageLines.toLocaleString("es-AR", { maximumFractionDigits: 1 }), background: "#b8d6e4", border: "#a7cbdc", labelColor: "#275f7f", valueColor: "#123f5b", dot: "#3f7f9f" },
+              { label: "Líneas por pedido", value: monthlySummary?.linesPerOrder.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }), background: "#eef5f9", border: "#d7e6ee", labelColor: "#5f879d", valueColor: "#285d7b", dot: "#79a3ba" },
+            ].map((kpi) => (
+              <div
+                key={kpi.label}
+                className="relative flex min-h-16 items-center justify-between gap-3 overflow-hidden rounded-[16px] border px-3.5 py-2.5 sm:px-4"
+                style={{ borderColor: kpi.border, backgroundColor: kpi.background }}
+              >
+                <p className="flex items-center gap-2 text-[9px] font-bold uppercase leading-4 tracking-[0.12em]" style={{ color: kpi.labelColor }}>
+                  <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: kpi.dot }} aria-hidden="true" />
+                  {kpi.label}
+                </p>
+                <p className="shrink-0 text-lg font-semibold tracking-[-0.035em]" style={{ color: kpi.valueColor }}>{kpi.value ?? "—"}</p>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="rounded-[24px] border border-[var(--line)] bg-white p-4 shadow-[0_18px_48px_-40px_rgba(14,40,65,0.5)] sm:p-5">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.85fr)]">
+            <div className="min-w-0 lg:pr-1">
             <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
               <div><h3 className="text-sm font-semibold text-[var(--navy)]">Líneas por día</h3><p className="mt-1 text-xs text-[var(--muted)]">Cantidad de códigos procesados por pedido.</p></div>
               <div className="flex items-center gap-2 text-[9px] font-semibold text-[var(--muted)]" aria-label="Escala de rendimiento"><span><i className="mr-1 inline-block size-1.5 rounded-full bg-emerald-500" />A</span><span><i className="mr-1 inline-block size-1.5 rounded-full bg-amber-400" />B</span><span><i className="mr-1 inline-block size-1.5 rounded-full bg-red-500" />C</span></div>
@@ -336,9 +370,9 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
               </button>
               <Calendar mode="single" month={month} onMonthChange={changeMonth} selected={date} onSelect={setDate} showOutsideDays={false} timeZone="America/Argentina/Buenos_Aires" noonSafe components={{ DayButton, Week, Weekdays: ExecutiveWeekdays }} classNames={{ root: "!w-full !p-0", months: "!w-full", month: "!w-full !space-y-1.5", month_caption: "!h-9 !justify-start px-2", caption_label: "!text-base !text-[var(--blue)]", nav: "absolute right-1 top-0 flex items-center gap-1", button_previous: "!text-[var(--blue)]", button_next: "!text-[var(--blue)]", month_grid: "!w-full", weekdays: "!grid !grid-cols-7 sm:!grid-cols-[repeat(7,minmax(0,1fr))_76px]", weekday: "!w-auto !py-1.5", week: "!mt-1 !grid !grid-cols-7 sm:!grid-cols-[repeat(7,minmax(0,1fr))_76px]", day: "!h-11 !w-auto sm:!h-12", day_button: "!h-11 !rounded-xl sm:!h-12" }} />
             </div>
-          </div>
+            </div>
 
-          <aside className="flex min-h-[390px] flex-col rounded-[20px] border border-[var(--line)] bg-[var(--navy-soft)]/55 p-4 sm:p-5" aria-live="polite">
+            <aside className="flex min-h-[390px] flex-col rounded-[20px] border border-[var(--line)] bg-[var(--navy-soft)]/55 p-4 sm:p-5" aria-live="polite">
             <div className="flex items-start justify-between gap-3">
               <div><p className="text-[9px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Últimos registros</p><h3 className="mt-1 text-sm font-semibold text-[var(--navy)]">Evolución reciente</h3></div>
               <span className="rounded-full border border-white/90 bg-white/65 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">30 días</span>
@@ -353,9 +387,10 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
                 {selected ? <div className="text-right"><p className={`text-xl font-semibold tracking-[-0.035em] ${classText[selected.classification]}`}>{selected.lines.toLocaleString("es-AR")}</p><p className="mt-0.5 text-[9px] text-[var(--muted)]">{selected.orders.toLocaleString("es-AR")} pedidos</p></div> : requestState === "error" ? <button type="button" onClick={retryConnection} className="text-xs font-semibold text-[var(--blue)] hover:underline">Reintentar</button> : <p className="text-xs font-semibold text-[var(--navy)]">{requestState === "loading" ? "Consultando…" : "Sin actividad"}</p>}
               </div>
             </div>
-          </aside>
-        </div>
-      </article>
+            </aside>
+          </div>
+        </article>
+      </div>
     </section>
   );
 }
