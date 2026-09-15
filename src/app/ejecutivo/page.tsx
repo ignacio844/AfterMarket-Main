@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ExternalLink, MapPinned, ReceiptText } from "lucide-react";
+import { ExternalLink, LayoutDashboard, MapPinned, ReceiptText } from "lucide-react";
 import { auth } from "@/auth";
 import { ExecutiveCalendarIndicator } from "@/components/executive-indicator-calendar";
 import { ExecutiveTopBrands } from "@/components/executive-top-brands";
@@ -18,6 +18,12 @@ const executiveApps = [
     description: "Clientes y oportunidades por zona.",
     href: "https://mapa-comercial-aftermarket.vercel.app/",
     icon: MapPinned,
+  },
+  {
+    name: "Dashboard de Auditoría",
+    description: "Indicadores consolidados de auditoría.",
+    href: "https://auditoria-pro-nachin1.vercel.app/consolidado",
+    icon: LayoutDashboard,
   },
 ] as const;
 
@@ -69,7 +75,7 @@ export default async function EjecutivoPage() {
         </section>
 
         <section className="mt-5 rounded-[24px] border border-[var(--line)] bg-white p-4 sm:p-5" aria-labelledby="executive-apps-title">
-          <div className="grid items-stretch gap-3 md:grid-cols-[190px_repeat(2,minmax(0,1fr))]">
+          <div className="grid items-stretch gap-3 md:grid-cols-[160px_repeat(3,minmax(0,1fr))] xl:grid-cols-[190px_repeat(3,minmax(0,1fr))]">
             <div className="flex flex-col justify-center px-1 py-2">
               <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-[var(--blue)]">Herramientas</p>
               <h2 id="executive-apps-title" className="mt-1 text-lg font-semibold tracking-[-0.02em] text-[var(--navy)]">

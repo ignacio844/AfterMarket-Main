@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
-import type { DayButtonProps, WeekProps } from "react-day-picker";
+import { CalendarDays } from "lucide-react";
+import type { DateRange, DayButtonProps, WeekProps } from "react-day-picker";
 import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
+import { Card, CardContent } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { DailyLinesClass, DailyLinesMetric, DailyLinesResponse } from "@/lib/executive-lines";
 
 type RequestState = "loading" | "ready" | "empty" | "error";
@@ -35,6 +38,13 @@ function calendarWeekRange(month: Date) {
   return { from: dateKey(from), to: dateKey(to) };
 }
 
+function initialKpiRange(today: Date): DateRange {
+  return {
+    from: new Date(today.getFullYear(), today.getMonth(), 1, 12),
+    to: today,
+  };
+}
+
 function longShortDate(date: Date) {
   return new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "short" })
     .format(date)
@@ -58,6 +68,16 @@ function smoothPath(points: Array<{ x: number; y: number }>) {
     const midX = (previous.x + point.x) / 2;
     return `${path} C ${midX} ${previous.y}, ${midX} ${point.y}, ${point.x} ${point.y}`;
   }, `M ${points[0].x} ${points[0].y}`);
+}
+
+async function fetchDailyLines(target: { from: string; to: string }, signal: AbortSignal) {
+  const response = await fetch(`/api/executive/daily-lines?${new URLSearchParams(target)}`, {
+    cache: "no-store",
+    signal,
+  });
+  const payload = await response.json() as DailyLinesResponse & { error?: string };
+  if (!response.ok) throw new Error(payload.error ?? "No se pudieron consultar los indicadores.");
+  return payload;
 }
 
 function TrendChart({ days }: { days: DailyLinesMetric[] }) {
@@ -224,6 +244,8 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
   const [data, setData] = useState<DailyLinesResponse | null>(null);
   const [weekData, setWeekData] = useState<DailyLinesResponse | null>(null);
   const [trendData, setTrendData] = useState<DailyLinesResponse | null>(null);
+  const [kpiData, setKpiData] = useState<DailyLinesResponse | null>(null);
+  const [kpiDateRange, setKpiDateRange] = useState<DateRange | undefined>(() => initialKpiRange(today));
   const [requestState, setRequestState] = useState<RequestState>("loading");
   const [trendState, setTrendState] = useState<RequestState>("loading");
   const [retry, setRetry] = useState(0);
@@ -234,20 +256,18 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
     from.setDate(from.getDate() - 92);
     return { from: dateKey(from), to: dateKey(today) };
   }, [today]);
+  const selectedKpiRange = useMemo(() => {
+    if (!kpiDateRange?.from || !kpiDateRange.to) return null;
+    return { from: dateKey(kpiDateRange.from), to: dateKey(kpiDateRange.to) };
+  }, [kpiDateRange]);
 
   useEffect(() => {
     const controller = new AbortController();
-    async function getMetrics(target: { from: string; to: string }) {
-      const response = await fetch(`/api/executive/daily-lines?${new URLSearchParams(target)}`, { cache: "no-store", signal: controller.signal });
-      const payload = await response.json() as DailyLinesResponse & { error?: string };
-      if (!response.ok) throw new Error(payload.error ?? "No se pudieron consultar los indicadores.");
-      return payload;
-    }
     async function load() {
       const [calendarResult, weekResult, trendResult] = await Promise.allSettled([
-        getMetrics(range),
-        getMetrics(weekRange),
-        getMetrics(trendRange),
+        fetchDailyLines(range, controller.signal),
+        fetchDailyLines(weekRange, controller.signal),
+        fetchDailyLines(trendRange, controller.signal),
       ]);
       if (controller.signal.aborted) return;
       if (calendarResult.status === "fulfilled") {
@@ -278,25 +298,52 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
     return () => { controller.abort(); window.clearInterval(timer); };
   }, [range, retry, trendRange, weekRange]);
 
+  useEffect(() => {
+    if (!selectedKpiRange) return;
+    const targetRange = selectedKpiRange;
+    const controller = new AbortController();
+
+    async function loadKpis() {
+      setKpiData(null);
+      try {
+        setKpiData(await fetchDailyLines(targetRange, controller.signal));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error("Error cargando el resumen del período:", error);
+        setKpiData(null);
+      }
+    }
+
+    void loadKpis();
+    const timer = window.setInterval(() => void loadKpis(), TWO_HOURS_MS);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [selectedKpiRange]);
+
   const metrics = useMemo(() => new Map(data?.days.map((metric) => [metric.date, metric]) ?? []), [data]);
   const weekMetrics = useMemo(() => new Map(weekData?.days.map((metric) => [metric.date, metric]) ?? []), [weekData]);
-  const monthlySummary = useMemo(() => {
-    if (!data) return null;
+  const kpiSummary = useMemo(() => {
+    if (!kpiData || !selectedKpiRange) return null;
 
-    const lines = data.days.reduce((total, metric) => total + metric.lines, 0);
-    const orders = data.days.reduce((total, metric) => total + metric.orders, 0);
+    const lines = kpiData.days.reduce((total, metric) => total + metric.lines, 0);
+    const orders = kpiData.days.reduce((total, metric) => total + metric.orders, 0);
 
     return {
       lines,
       orders,
-      averageLines: data.averageLines,
+      averageLines: kpiData.averageLines,
       linesPerOrder: orders > 0 ? lines / orders : 0,
     };
-  }, [data]);
+  }, [kpiData, selectedKpiRange]);
   const selected = date ? metrics.get(dateKey(date)) : undefined;
   const selectedLabel = date ? new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date) : null;
   const updatedAt = trendData?.updatedAt ?? data?.updatedAt;
   const updatedLabel = updatedAt ? new Intl.DateTimeFormat("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(updatedAt)) : null;
+  const kpiRangeLabel = useMemo(() => {
+    if (!kpiDateRange?.from) return "Seleccionar período";
+    if (!kpiDateRange.to) return `Desde ${longShortDate(kpiDateRange.from)}`;
+    if (dateKey(kpiDateRange.from) === dateKey(kpiDateRange.to)) return longShortDate(kpiDateRange.from);
+    return `${longShortDate(kpiDateRange.from)} – ${longShortDate(kpiDateRange.to)}`;
+  }, [kpiDateRange]);
   const DayButton = useCallback((props: DayButtonProps) => <ExecutiveDayButton {...props} metric={metrics.get(dateKey(props.day.date))} />, [metrics]);
   const Week = useCallback((props: WeekProps) => <ExecutiveWeek {...props} metrics={weekMetrics} today={today} />, [today, weekMetrics]);
   const isCurrentMonth = month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth();
@@ -320,6 +367,10 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
     setRetry((value) => value + 1);
   }
 
+  function resetKpiDateRange() {
+    setKpiDateRange(initialKpiRange(today));
+  }
+
   return (
     <section className="mt-5 w-full" aria-labelledby="executive-indicators-title">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3 px-1">
@@ -328,26 +379,82 @@ export function ExecutiveCalendarIndicator({ initialDate }: { initialDate: strin
       </div>
 
       <div className="space-y-[7px]">
-        <article className="rounded-[24px] border border-[var(--line)] bg-white p-4 shadow-[0_18px_48px_-40px_rgba(14,40,65,0.5)] sm:p-5" aria-label="Resumen del mes visible">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {[
-              { label: "Líneas del mes", value: monthlySummary?.lines.toLocaleString("es-AR"), background: "#174d70", border: "#174d70", labelColor: "#cfe5f1", valueColor: "#ffffff", dot: "#8bc3df" },
-              { label: "Pedidos del mes", value: monthlySummary?.orders.toLocaleString("es-AR"), background: "#34779f", border: "#34779f", labelColor: "#e1eff6", valueColor: "#ffffff", dot: "#b9dbea" },
-              { label: "Promedio diario", value: monthlySummary?.averageLines.toLocaleString("es-AR", { maximumFractionDigits: 1 }), background: "#b8d6e4", border: "#a7cbdc", labelColor: "#275f7f", valueColor: "#123f5b", dot: "#3f7f9f" },
-              { label: "Líneas por pedido", value: monthlySummary?.linesPerOrder.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }), background: "#eef5f9", border: "#d7e6ee", labelColor: "#5f879d", valueColor: "#285d7b", dot: "#79a3ba" },
-            ].map((kpi) => (
-              <div
-                key={kpi.label}
-                className="relative flex min-h-16 items-center justify-between gap-3 overflow-hidden rounded-[16px] border px-3.5 py-2.5 sm:px-4"
-                style={{ borderColor: kpi.border, backgroundColor: kpi.background }}
-              >
-                <p className="flex items-center gap-2 text-[9px] font-bold uppercase leading-4 tracking-[0.12em]" style={{ color: kpi.labelColor }}>
-                  <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: kpi.dot }} aria-hidden="true" />
-                  {kpi.label}
-                </p>
-                <p className="shrink-0 text-lg font-semibold tracking-[-0.035em]" style={{ color: kpi.valueColor }}>{kpi.value ?? "—"}</p>
-              </div>
-            ))}
+        <article className="rounded-[24px] border border-[var(--line)] bg-white p-4 shadow-[0_18px_48px_-40px_rgba(14,40,65,0.5)] sm:p-5" aria-label="Resumen del período seleccionado">
+          <div className="grid grid-cols-[minmax(0,1fr)_48px] gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { label: "Líneas del período", value: kpiSummary?.lines.toLocaleString("es-AR"), background: "#174d70", border: "#174d70", labelColor: "#cfe5f1", valueColor: "#ffffff", dot: "#8bc3df" },
+                { label: "Pedidos del período", value: kpiSummary?.orders.toLocaleString("es-AR"), background: "#34779f", border: "#34779f", labelColor: "#e1eff6", valueColor: "#ffffff", dot: "#b9dbea" },
+                { label: "Promedio diario", value: kpiSummary?.averageLines.toLocaleString("es-AR", { maximumFractionDigits: 1 }), background: "#b8d6e4", border: "#a7cbdc", labelColor: "#275f7f", valueColor: "#123f5b", dot: "#3f7f9f" },
+                { label: "Líneas por pedido", value: kpiSummary?.linesPerOrder.toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }), background: "#eef5f9", border: "#d7e6ee", labelColor: "#5f879d", valueColor: "#285d7b", dot: "#79a3ba" },
+              ].map((kpi) => (
+                <div
+                  key={kpi.label}
+                  className="relative flex min-h-16 items-center justify-between gap-3 overflow-hidden rounded-[16px] border px-3.5 py-2.5 sm:px-4"
+                  style={{ borderColor: kpi.border, backgroundColor: kpi.background }}
+                >
+                  <p className="flex items-center gap-2 text-[9px] font-bold uppercase leading-4 tracking-[0.12em]" style={{ color: kpi.labelColor }}>
+                    <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: kpi.dot }} aria-hidden="true" />
+                    {kpi.label}
+                  </p>
+                  <p className="shrink-0 text-lg font-semibold tracking-[-0.035em]" style={{ color: kpi.valueColor }}>{kpi.value ?? "—"}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-center border-l border-[var(--line)] pl-3">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={`Seleccionar período de los indicadores. ${kpiRangeLabel}`}
+                    title={`Período: ${kpiRangeLabel}`}
+                    className="grid size-11 place-items-center rounded-full border border-[var(--line)] bg-slate-100 text-slate-500 shadow-sm transition hover:bg-slate-200 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/35"
+                  >
+                    <CalendarDays aria-hidden="true" className="size-5" strokeWidth={1.8} />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" side="left" sideOffset={12} className="w-auto p-0">
+                  <Card className="overflow-hidden p-0">
+                    <CardContent className="p-0">
+                      <Calendar
+                        mode="range"
+                        onSelect={setKpiDateRange}
+                        selected={kpiDateRange}
+                        classNames={{
+                          root: "!p-2",
+                          month: "!space-y-1",
+                          month_caption: "!h-8 !justify-start px-1 pr-16",
+                          caption_label: "!text-sm",
+                          nav: "!absolute !left-[8.25rem] !right-auto !top-0 !h-8 !gap-0.5",
+                          button_previous: "!size-7 !text-slate-500 hover:!bg-slate-100 hover:!text-slate-700",
+                          button_next: "!size-7 !text-slate-500 hover:!bg-slate-100 hover:!text-slate-700",
+                          weekday: "!w-8 !py-1 !text-[10px]",
+                          week: "!mt-0",
+                          day: "!size-8",
+                          day_button: "!size-8 !rounded-lg !text-xs !transition-colors hover:!bg-slate-100 hover:!text-[var(--navy)]",
+                          selected: "[&>button]:!font-semibold [&>button]:!text-[var(--navy)]",
+                          range_start: "!rounded-l-lg !bg-[#dcebf3] [&>button]:!rounded-l-lg [&>button]:!rounded-r-none [&>button]:!bg-[#dcebf3] [&>button]:!text-[var(--navy)] [&>button:hover]:!bg-[#bfd9e6]",
+                          range_middle: "!bg-[#dcebf3] [&>button]:!rounded-none [&>button]:!bg-transparent [&>button]:!text-[var(--navy)] [&>button:hover]:!bg-[#bfd9e6]",
+                          range_end: "!rounded-r-lg !bg-[#dcebf3] [&>button]:!rounded-l-none [&>button]:!rounded-r-lg [&>button]:!bg-[#dcebf3] [&>button]:!text-[var(--navy)] [&>button:hover]:!bg-[#bfd9e6]",
+                          today: "[&>button]:!font-extrabold [&>button]:!text-[#174d70] [&>button]:!ring-0",
+                        }}
+                      />
+                      <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] px-3 py-2">
+                        <span className="text-[10px] font-medium text-[var(--muted)]">{kpiRangeLabel}</span>
+                        <button
+                          type="button"
+                          onClick={resetKpiDateRange}
+                          className="rounded-lg px-2.5 py-1.5 text-[10px] font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/35"
+                        >
+                          Limpiar
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </article>
 
