@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowDownRight, Boxes, Clock3, PackageCheck, ShoppingCart, TrendingUp } from "lucide-react";
 import { auth } from "@/auth";
 import { ComprasDashboardActions } from "@/components/compras-dashboard-actions";
+import { ComprasWarnesSyncButton } from "@/components/compras-warnes-sync-button";
 import { ComprasGestionWorkspace } from "@/components/compras-gestion-workspace";
 import { ComprasHistorialWorkspace } from "@/components/compras-historial-workspace";
 import { ComprasEnviosWorkspace } from "@/components/compras-envios-workspace";
@@ -46,7 +48,15 @@ function decimal(value: number, digits: number) {
   return Number(value || 0).toFixed(digits);
 }
 
-function SourceStatus({ label, source }: { label: string; source: DashboardSource }) {
+function SourceStatus({
+  label,
+  source,
+  action,
+}: {
+  label: string;
+  source: DashboardSource;
+  action?: ReactNode;
+}) {
   const tone = source.icono === "🟢"
     ? "border-emerald-200 bg-emerald-50 text-emerald-800"
     : source.icono === "🟡"
@@ -54,13 +64,17 @@ function SourceStatus({ label, source }: { label: string; source: DashboardSourc
       : source.icono === "🔴"
         ? "border-red-200 bg-red-50 text-red-800"
         : "border-[var(--line)] bg-[var(--soft)] text-[var(--muted)]";
+
   return (
-    <div className={`flex min-w-0 items-center gap-3 rounded-2xl border px-4 py-3 ${tone}`}>
-      <span aria-hidden="true" className="text-sm">{source.icono}</span>
-      <div className="min-w-0">
-        <p className="truncate text-[10px] font-bold uppercase tracking-[0.13em]">{label}</p>
-        <p className="mt-1 truncate text-xs font-semibold">{source.fecha}</p>
+    <div className={`flex min-w-0 items-center justify-between gap-3 rounded-2xl border px-4 py-3 ${tone}`}>
+      <div className="flex min-w-0 items-center gap-3">
+        <span aria-hidden="true" className="text-sm">{source.icono}</span>
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-bold uppercase tracking-[0.13em]">{label}</p>
+          <p className="mt-1 truncate text-xs font-semibold">{source.fecha}</p>
+        </div>
       </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -156,7 +170,7 @@ function DashboardContent({ dashboard }: { dashboard: ComprasDashboard }) {
           <Clock3 aria-hidden="true" className="size-5 text-[var(--muted)]" strokeWidth={1.7} />
         </div>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <SourceStatus label="Stock Warnes" source={dashboard.fuentes.stockWarnes} />
+          <SourceStatus label="Stock Warnes" source={dashboard.fuentes.stockWarnes} action={<ComprasWarnesSyncButton />} />
           <SourceStatus label="Stock Escobar" source={dashboard.fuentes.stockEscobar} />
           <SourceStatus label="Ventas" source={dashboard.fuentes.ventas} />
           <SourceStatus label="Órdenes de compra" source={dashboard.fuentes.ordenes} />
