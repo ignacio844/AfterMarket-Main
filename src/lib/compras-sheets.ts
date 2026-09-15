@@ -15,6 +15,11 @@ import { calculateComprasContenedores, type ComprasContenedores } from "@/lib/co
 import { calculateComprasSeguimiento, type ComprasSeguimiento } from "@/lib/compras-seguimiento";
 import { calculateComprasRecepciones, type ComprasRecepciones } from "@/lib/compras-recepciones";
 import { calculateComprasTransferencias, type ComprasTransferencias } from "@/lib/compras-transferencias";
+import {
+  applyWarnesImportDateToControlStock,
+  applyWarnesStockToDashboardModel,
+  getComprasStockWarnesActual,
+} from "@/lib/compras-stock-supabase";
 
 const READ_ONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEET_NAMES = {
@@ -113,8 +118,25 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
   const session = await auth();
   const email = session?.user?.email;
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
-  const { sheets } = await readSheets(["modelo", "config", "alias", "controlStock", "ventas", "logImportaciones"], "modelo");
-  return calculateComprasDashboard(sheets, email);
+
+  const [{ sheets }, warnes] = await Promise.all([
+    readSheets(
+      ["modelo", "config", "alias", "controlStock", "ventas", "logImportaciones"],
+      "modelo",
+    ),
+    getComprasStockWarnesActual(),
+  ]);
+
+  const dashboardSheets = {
+    ...sheets,
+    modelo: applyWarnesStockToDashboardModel(sheets.modelo, warnes.stockBySku),
+    controlStock: applyWarnesImportDateToControlStock(
+      sheets.controlStock,
+      warnes.fechaImportacion,
+    ),
+  };
+
+  return calculateComprasDashboard(dashboardSheets, email);
 }
 
 export async function getComprasGestion(): Promise<ComprasGestion> {
