@@ -2,6 +2,11 @@ name: Sync WARNES Stock
 
 on:
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: "ID opcional de compras_sync_requests creado por el portal"
+        required: false
+        type: string
 
   schedule:
     # 07:00 Argentina (UTC-3) = 10:00 UTC
@@ -11,6 +16,25 @@ jobs:
   sync-warnes:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
+    env:
+      WMS_BASE_URL: ${{ secrets.WMS_BASE_URL }}
+      WMS_USERNAME: ${{ secrets.WMS_USERNAME }}
+      WMS_PASSWORD: ${{ secrets.WMS_PASSWORD }}
+
+      # GitHub Actions usa Chromium administrado por Playwright.
+      WMS_BROWSER_CHANNEL: ""
+
+      WMS_DOWNLOAD_DIR: entrada
+      WMS_MIN_SKUS: "4000"
+      WMS_MAX_SKU_DELTA: "0.25"
+      WMS_MAX_STOCK_DELTA: "0.30"
+
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      SUPABASE_SCHEMA: portal_aftermarket
+
+      REQUEST_ID: ${{ github.event.inputs.request_id || '' }}
 
     defaults:
       run:
@@ -36,22 +60,120 @@ jobs:
         run: |
           python -m playwright install --with-deps chromium
 
-      - name: Sync WARNES stock to Supabase
-        env:
-          WMS_BASE_URL: ${{ secrets.WMS_BASE_URL }}
-          WMS_USERNAME: ${{ secrets.WMS_USERNAME }}
-          WMS_PASSWORD: ${{ secrets.WMS_PASSWORD }}
-
-          WMS_BROWSER_CHANNEL: ""
-
-          WMS_DOWNLOAD_DIR: entrada
-          WMS_MIN_SKUS: "4000"
-          WMS_MAX_SKU_DELTA: "0.25"
-          WMS_MAX_STOCK_DELTA: "0.30"
-
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          SUPABASE_SCHEMA: portal_aftermarket
-
+      - name: Mark portal request as processing
+        if: ${{ env.REQUEST_ID != '' }}
+        shell: bash
         run: |
+          NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+          BODY="$(jq -n \
+            --arg status "PROCESANDO" \
+            --arg started_at "$NOW" \
+            --argjson github_run_id "${{ github.run_id }}" \
+            '{
+              status: $status,
+              started_at: $started_at,
+              github_run_id: $github_run_id,
+              error_message: null,
+              updated_at: $started_at
+            }'
+          )"
+
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            "${SUPABASE_URL}/rest/v1/compras_sync_requests?id=eq.${REQUEST_ID}" \
+            --header "apikey: ${SUPABASE_SECRET_KEY}" \
+            --header "Authorization: Bearer ${SUPABASE_SECRET_KEY}" \
+            --header "Content-Type: application/json" \
+            --header "Content-Profile: ${SUPABASE_SCHEMA}" \
+            --header "Prefer: return=minimal" \
+            --data "${BODY}"
+
+      - name: Sync WARNES stock to Supabase
+        id: sync
+        shell: bash
+        run: |
+          set +e
           python wms_stock_sync.py
+          EXIT_CODE=$?
+          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Complete portal request
+        if: ${{ env.REQUEST_ID != '' && steps.sync.outputs.exit_code == '0' }}
+        shell: bash
+        run: |
+          IMPORT_JSON="$(curl --fail-with-body --silent --show-error \
+            "${SUPABASE_URL}/rest/v1/compras_stock_imports?select=id&source_system=eq.WMS&deposito=eq.WARNES&estado=eq.VALIDADO&order=fecha_importacion.desc,id.desc&limit=1" \
+            --header "apikey: ${SUPABASE_SECRET_KEY}" \
+            --header "Authorization: Bearer ${SUPABASE_SECRET_KEY}" \
+            --header "Accept-Profile: ${SUPABASE_SCHEMA}"
+          )"
+
+          IMPORT_ID="$(echo "${IMPORT_JSON}" | jq -r '.[0].id // empty')"
+
+          if [ -z "${IMPORT_ID}" ]; then
+            echo "No se pudo determinar el import_id validado."
+            exit 1
+          fi
+
+          NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+          BODY="$(jq -n \
+            --arg status "COMPLETADO" \
+            --arg finished_at "$NOW" \
+            --argjson import_id "${IMPORT_ID}" \
+            '{
+              status: $status,
+              finished_at: $finished_at,
+              import_id: $import_id,
+              error_message: null,
+              updated_at: $finished_at
+            }'
+          )"
+
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            "${SUPABASE_URL}/rest/v1/compras_sync_requests?id=eq.${REQUEST_ID}" \
+            --header "apikey: ${SUPABASE_SECRET_KEY}" \
+            --header "Authorization: Bearer ${SUPABASE_SECRET_KEY}" \
+            --header "Content-Type: application/json" \
+            --header "Content-Profile: ${SUPABASE_SCHEMA}" \
+            --header "Prefer: return=minimal" \
+            --data "${BODY}"
+
+      - name: Mark portal request as failed
+        if: ${{ always() && env.REQUEST_ID != '' && steps.sync.outputs.exit_code != '0' }}
+        shell: bash
+        run: |
+          NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          MESSAGE="La sincronización WARNES falló en GitHub Actions. Run ID: ${{ github.run_id }}"
+
+          BODY="$(jq -n \
+            --arg status "ERROR" \
+            --arg finished_at "$NOW" \
+            --arg error_message "$MESSAGE" \
+            '{
+              status: $status,
+              finished_at: $finished_at,
+              error_message: $error_message,
+              updated_at: $finished_at
+            }'
+          )"
+
+          curl --fail-with-body --silent --show-error \
+            --request PATCH \
+            "${SUPABASE_URL}/rest/v1/compras_sync_requests?id=eq.${REQUEST_ID}" \
+            --header "apikey: ${SUPABASE_SECRET_KEY}" \
+            --header "Authorization: Bearer ${SUPABASE_SECRET_KEY}" \
+            --header "Content-Type: application/json" \
+            --header "Content-Profile: ${SUPABASE_SCHEMA}" \
+            --header "Prefer: return=minimal" \
+            --data "${BODY}"
+
+      - name: Fail workflow if sync failed
+        if: ${{ steps.sync.outputs.exit_code != '0' }}
+        shell: bash
+        run: |
+          echo "La sincronización WARNES falló."
+          exit 1
