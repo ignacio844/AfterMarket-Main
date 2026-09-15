@@ -4,6 +4,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $auditRoot = 'C:\Users\Auditoria\Desktop\AUDITORIAS\GRUPO AFTERMARKET\REACT\AUDITORIA.BESTIA\sistema-auditoria'
 $runtimeDirectory = Join-Path $projectRoot '.runtime'
 $bridgeEnvironment = Join-Path $projectRoot '.env.bridge'
+$portalEnvironment = Join-Path $projectRoot '.env.local'
 $auditBridgeEnvironment = Join-Path $auditRoot '.env.bridge'
 $supervisorLog = Join-Path $runtimeDirectory 'shared-bridge-supervisor.log'
 $ngrokPublicUrl = 'https://surgical-dean-overtime.ngrok-free.dev'
@@ -59,6 +60,22 @@ function Start-ExecutiveBridge {
   Write-SupervisorLog 'Bridge Ejecutivo iniciado en 8788.'
 }
 
+function Start-VentasBridge {
+  if (-not (Test-Path -LiteralPath $bridgeEnvironment)) {
+    throw "No se encontró $bridgeEnvironment"
+  }
+  Start-NodeProcess -WorkingDirectory $projectRoot -Arguments @('--env-file=.env.local', '--env-file=.env.bridge', 'bridge/ventas-sync.mjs') -LogPrefix 'ventas-bridge'
+  Write-SupervisorLog 'Worker de Ventas iniciado en 8789.'
+}
+
+function Test-VentasConfigured {
+  if (-not (Test-Path -LiteralPath $portalEnvironment)) { return $false }
+  $content = Get-Content -LiteralPath $portalEnvironment
+  $hasUrl = $content | Where-Object { $_ -match '^\s*SUPABASE_URL\s*=\s*\S+' } | Select-Object -First 1
+  $hasKey = $content | Where-Object { $_ -match '^\s*SUPABASE_SECRET_KEY\s*=\s*\S+' } | Select-Object -First 1
+  return [bool]($hasUrl -and $hasKey)
+}
+
 function Start-Gateway {
   Start-NodeProcess -WorkingDirectory $projectRoot -Arguments @('bridge/gateway.mjs') -LogPrefix 'bridge-gateway'
   Write-SupervisorLog 'Gateway compartido iniciado en 8790.'
@@ -109,6 +126,9 @@ Write-SupervisorLog 'Supervisor compartido iniciado.'
 while ($true) {
   Ensure-Service -HealthUri 'http://127.0.0.1:8787/health' -StartAction ${function:Start-AuditBridge} -ServiceName 'bridge de Auditoría'
   Ensure-Service -HealthUri 'http://127.0.0.1:8788/health' -StartAction ${function:Start-ExecutiveBridge} -ServiceName 'bridge Ejecutivo'
+  if (Test-VentasConfigured) {
+    Ensure-Service -HealthUri 'http://127.0.0.1:8789/health' -StartAction ${function:Start-VentasBridge} -ServiceName 'worker de Ventas'
+  }
   Ensure-Service -HealthUri 'http://127.0.0.1:8790/health' -StartAction ${function:Start-Gateway} -ServiceName 'gateway compartido'
 
   $tunnel = Get-NgrokTunnel

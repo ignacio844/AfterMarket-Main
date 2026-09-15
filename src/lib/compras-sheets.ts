@@ -20,6 +20,10 @@ import {
   applyWarnesStockToDashboardModel,
   getComprasStockWarnesActual,
 } from "@/lib/compras-stock-supabase";
+import {
+  getComprasVentasActual,
+  ventasFreshnessRows,
+} from "@/lib/compras-ventas-supabase";
 
 const READ_ONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEET_NAMES = {
@@ -119,12 +123,13 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
   const email = session?.user?.email;
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
 
-  const [{ sheets }, warnes] = await Promise.all([
+  const [{ sheets }, warnes, ventas] = await Promise.all([
     readSheets(
-      ["modelo", "config", "alias", "controlStock", "ventas", "logImportaciones"],
+      ["modelo", "config", "alias", "controlStock", "logImportaciones"],
       "modelo",
     ),
     getComprasStockWarnesActual(),
+    getComprasVentasActual(),
   ]);
 
   const dashboardSheets = {
@@ -134,6 +139,7 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
       sheets.controlStock,
       warnes.fechaImportacion,
     ),
+    ventas: ventasFreshnessRows(ventas.fechaImportacion),
   };
 
   return calculateComprasDashboard(dashboardSheets, email);

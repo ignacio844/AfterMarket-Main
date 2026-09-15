@@ -5,6 +5,7 @@ import { AlertCircle, ArrowDownRight, Boxes, Clock3, PackageCheck, ShoppingCart,
 import { auth } from "@/auth";
 import { ComprasDashboardActions } from "@/components/compras-dashboard-actions";
 import { ComprasWarnesSyncButton } from "@/components/compras-warnes-sync-button";
+import { ComprasVentasSyncButton } from "@/components/compras-ventas-sync-button";
 import { ComprasGestionWorkspace } from "@/components/compras-gestion-workspace";
 import { ComprasHistorialWorkspace } from "@/components/compras-historial-workspace";
 import { ComprasEnviosWorkspace } from "@/components/compras-envios-workspace";
@@ -172,7 +173,7 @@ function DashboardContent({ dashboard }: { dashboard: ComprasDashboard }) {
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <SourceStatus label="Stock Warnes" source={dashboard.fuentes.stockWarnes} action={<ComprasWarnesSyncButton />} />
           <SourceStatus label="Stock Escobar" source={dashboard.fuentes.stockEscobar} />
-          <SourceStatus label="Ventas" source={dashboard.fuentes.ventas} />
+          <SourceStatus label="Ventas" source={dashboard.fuentes.ventas} action={<ComprasVentasSyncButton />} />
           <SourceStatus label="Órdenes de compra" source={dashboard.fuentes.ordenes} />
         </div>
       </section>

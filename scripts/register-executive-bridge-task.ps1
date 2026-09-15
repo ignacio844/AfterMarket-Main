@@ -27,7 +27,7 @@ Register-ScheduledTask `
   -Trigger $trigger `
   -Settings $settings `
   -Principal $principal `
-  -Description 'Mantiene disponible el bridge SQL de indicadores ejecutivos en 127.0.0.1:8788.' `
+  -Description 'Mantiene disponibles el bridge SQL ejecutivo y el worker interno de Ventas.' `
   -Force | Out-Null
 
 Start-ScheduledTask -TaskName $taskName
