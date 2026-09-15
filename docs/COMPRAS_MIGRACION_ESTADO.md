@@ -8,7 +8,7 @@ Se está migrando el sistema de Compras de Google Apps Script + Google Sheets (f
 
 Google Sheets continúa como fuente temporal **solo de lectura** para los datos todavía no migrados. Toda llamada a Google y el uso de credenciales ocurren del lado servidor. Se usa exclusivamente la autenticación del portal actual (NextAuth con Google y `isPortalUserAllowed`). No se escribe en Sheets ni se ejecuta o porta allí ningún proceso que recalcule `MODELO_COMPRAS`.
 
-La migración de fuentes automatizadas ya comenzó. **Stock Warnes está migrado a Supabase y su sincronización automática fue validada por el usuario como efectiva al 100 %.** El worker escribe snapshots auditables en Supabase, no en Google Sheets. El siguiente objetivo acordado es **Ventas**.
+La migración de fuentes automatizadas ya comenzó. **Stock Warnes está migrado a Supabase y su sincronización automática fue validada por el usuario como efectiva al 100 %.** Ventas también dispone de ingesta SQL automática/manual, snapshots auditables y sustitución en memoria de la demanda legacy. Ninguno de los dos flujos escribe Google Sheets.
 
 No modificar otras secciones del portal salvo lo estrictamente necesario para Compras. La UI debe seguir la estética de Grupo Aftermarket, sin copiar visualmente el sistema legacy.
 
@@ -47,14 +47,15 @@ El Dashboard en `/areas/compras` conserva la lógica de `obtenerDashboardPortalC
 
 La fuente es actualmente **híbrida**:
 
-1. `src/lib/compras-sheets.ts` lee en paralelo Google Sheets y el snapshot Warnes vigente de Supabase.
-2. Desde Sheets obtiene `MODELO_COMPRAS`, configuración y alias de marcas, `CONTROL_IMPORTACIONES_STOCK`, sólo las filas 1 y 2 de `VENTAS`, y `LOG_IMPORTACIONES`.
+1. `src/lib/compras-sheets.ts` lee en paralelo Google Sheets y los snapshots vigentes de Warnes y Ventas en Supabase.
+2. Desde Sheets obtiene `MODELO_COMPRAS`, configuración y alias de marcas, `MAPA_SKU`, `CONTROL_IMPORTACIONES_STOCK` y `LOG_IMPORTACIONES`.
 3. `src/lib/compras-stock-supabase.ts` pagina la vista `compras_stock_actual_por_sku` de Supabase y obtiene `stock_warnes`, fecha e ID de importación.
 4. Antes de calcular el Dashboard, `applyWarnesStockToDashboardModel()` reemplaza en memoria `STOCK_WARNES` por SKU. Si un SKU del modelo no existe en el snapshot completo, su Warnes actual se considera `0`. Luego recalcula únicamente `STOCK_TOTAL = WARNES Supabase + ESCOBAR Sheets`.
 5. `applyWarnesImportDateToControlStock()` reemplaza en memoria la fecha de Warnes para que la tarjeta de frescura refleje la importación real de Supabase.
-6. `calculateComprasDashboard()` calcula agrupaciones y KPIs sin modificar ninguna fuente.
+6. `src/lib/compras-ventas-model.ts` aplica `MAPA_SKU` como el legacy y reemplaza en memoria sólo `CONSUMO_12_MESES` (agosto 2025 a julio 2026) y `PROMEDIO_MENSUAL` (suma / 12) desde Supabase.
+7. `calculateComprasDashboard()` calcula agrupaciones y KPIs sin modificar ninguna fuente.
 
-**Límite importante del estado actual:** `RIESGO`, `PENDIENTE_TOTAL`, `PROMEDIO_MENSUAL`, `CONSUMO_12_MESES` y `COMPRA_SUGERIDA` todavía provienen de las columnas ya calculadas de `MODELO_COMPRAS` en Sheets. Sólo `STOCK_WARNES` y `STOCK_TOTAL` son sustituidos en memoria. Por lo tanto, aunque el KPI de stock y las coberturas agregadas usan el Warnes nuevo, la clasificación de riesgo y la compra sugerida no se recalculan automáticamente a partir de ese cambio. Este acoplamiento debe resolverse cuando todas las fuentes necesarias estén migradas; no alterar esa lógica accidentalmente durante la fase Ventas.
+**Límite importante del estado actual:** `RIESGO`, `PENDIENTE_TOTAL` y `COMPRA_SUGERIDA` todavía provienen de las columnas ya calculadas de `MODELO_COMPRAS` en Sheets. No se recalculan automáticamente aunque hayan cambiado Warnes o la demanda. Ese recálculo integral queda para un hito posterior, cuando estén migradas las demás fuentes necesarias.
 
 ## Sincronización automática de Stock Warnes — completada
 
@@ -70,7 +71,7 @@ Flujo activo:
 - Controles previos a publicar: mínimo 4.000 SKU, variación máxima de 25 % en cantidad de SKU, variación máxima de 30 % en stock total y rechazo del mismo archivo mediante SHA-256. `--force` existe sólo para una variación extraordinaria verificada.
 - Supabase conserva cabecera, ítems, errores y metadatos de cada importación. Sólo una importación `VALIDADO` puede convertirse en snapshot vigente.
 - La migración `supabase/migrations/003_stock_compras.sql` crea `compras_stock_imports`, `compras_stock_import_items`, `compras_stock_import_errors`, `compras_stock_actual` y `compras_stock_actual_por_sku`. RLS está activo y el navegador no recibe la service role.
-- La migración `004_compras_sync_requests.sql` sólo admite actualmente `sync_type = STOCK_WARNES`; Ventas necesitará una migración propia o una ampliación explícita, no reutilizar ese valor.
+- La migración `005_compras_ventas.sql` amplía `compras_sync_requests` con el tipo y la FK independientes de Ventas, sin alterar la FK de Warnes.
 - `src/lib/compras-stock-import.ts` contiene un importador XLS del lado servidor de una etapa anterior, pero actualmente no está conectado a ninguna ruta. El camino productivo de Warnes es el worker Python.
 - El botón consulta cada 3 segundos durante un máximo aproximado de 6 minutos. Si muestra “Sigue en proceso”, GitHub Actions puede continuar hasta su timeout de 20 minutos.
 
@@ -82,7 +83,7 @@ Configuración privada usada por este flujo (registrar sólo nombres, nunca valo
 
 ## Datos y lógica de las vistas
 
-- Dashboard: lee `MODELO_COMPRAS`, `CONFIG_MARCAS_COMPRA`, `ALIAS_MARCAS_COMPRA`, `CONTROL_IMPORTACIONES_STOCK`, `VENTAS` y `LOG_IMPORTACIONES`.
+- Dashboard: lee `MODELO_COMPRAS`, `CONFIG_MARCAS_COMPRA`, `ALIAS_MARCAS_COMPRA`, `MAPA_SKU`, `CONTROL_IMPORTACIONES_STOCK` y `LOG_IMPORTACIONES`; Warnes y Ventas llegan desde Supabase.
 - Gestión: lee `GESTION_COMPRAS_ACTIVA`, `CONFIG_MARCAS_COMPRA` y `ALIAS_MARCAS_COMPRA`. El origen y la política de compra se resuelven desde configuración y alias, como en el legacy; no se toman de columnas precalculadas de la hoja de Gestión.
 - Cotizaciones: lee `GESTION_COMPRAS_ACTIVA`, `COTIZACIONES_COMPRA`, `COTIZACIONES_OFERTAS`, y sólo si falta `ORIGEN` en la hoja activa usa la configuración/alias de marcas. La bandeja incluye sólo SKU `IMPORTADO` con estado `COTIZAR` y `CANTIDAD_DECIDIDA > 0`, excluyendo los que figuran en una CT `ABIERTA`. Ordena por marca/SKU y calcula SKU, unidades y marcas. Los lotes CT agrupan sus ítems por `NRO_COTIZACION`; las ofertas se agrupan por proveedor (sin distinguir mayúsculas), con precio, cantidad, subtotal y total. El ranking compara precios unitarios positivos por SKU dentro de una misma moneda: empates en el mínimo son **MEJOR PRECIO** y el siguiente valor distinto es **2° PRECIO**. Para CT cerradas se muestra inicialmente la oferta seleccionada y se pueden expandir las demás.
 - Bandeja de Compra: lee `GESTION_COMPRAS_ACTIVA`, `COTIZACIONES_COMPRA` y `COTIZACIONES_OFERTAS`. Incluye cualquier SKU con estado `APROBADO` y `CANTIDAD_DECIDIDA > 0`, sin filtrar por origen. Cuenta SKU, suma unidades, cuenta marcas y ordena por marca/SKU. El cruce con CT `APROBADA` y su oferta del proveedor seleccionado completa número de cotización, proveedor y código de proveedor cuando existen. La selección es local; **Enviar a Compra** está deshabilitado porque `enviarACompraPortal()` escribe en Sheets. La descarga CSV usa sólo los datos ya leídos en el navegador.
@@ -97,38 +98,33 @@ Configuración privada usada por este flujo (registrar sólo nombres, nunca valo
 - Las fechas seriales del Historial se interpretan con la zona horaria declarada por la planilla y se presentan en `America/Argentina/Buenos_Aires`, como el Apps Script. La planilla consultada declara `America/Los_Angeles`; por eso una celda visible como `07:15` allí aparece como `11:15` en el historial durante agosto. La conversión considera horario de verano.
 - Gestión conserva los seis estados legacy: `PENDIENTE`, `COTIZAR`, `APROBADO`, `NO COMPRAR`, `POSTERGAR` y `ENVIADO A COMPRA`.
 - El resumen de Gestión cuenta registros visibles, pendientes, estados distintos de pendiente y suma `COMPRA_SUGERIDA` de los registros filtrados.
-- Los métodos operativos de escritura legacy, como `guardarDecisionCompraPortal`, `guardarGestionMasivaPortal`, generación de OC, recepción e importación logística, no se han portado. La única escritura nueva habilitada en Compras es la ingesta técnica de Warnes y el seguimiento de su solicitud en Supabase.
+- Los métodos operativos de escritura legacy, como `guardarDecisionCompraPortal`, `guardarGestionMasivaPortal`, generación de OC, recepción e importación logística, no se han portado. Las únicas escrituras nuevas habilitadas en Compras son las ingestas técnicas de Warnes y Ventas y el seguimiento de sus solicitudes en Supabase.
 
 El último control read-only de Google Sheets confirmó encabezados compatibles y una lectura completa de las tres hojas de Gestión. En ese momento, `GESTION_COMPRAS_ACTIVA` tenía 3.697 SKU; el número puede cambiar.
 
-## Próximo objetivo: automatización de Ventas
+## Automatización de Ventas — Hitos 1 y 2 completados
 
-Estado actual:
+La fuente autoritativa es `VS_REPORTING.dbo.Vista_Ventas_origen_v2`. El worker
+local `bridge/ventas-sync.mjs` replica la consulta legacy, netea unidades e
+importe sin IVA, normaliza DTM/IMP/JNM/NLI/NLD y publica snapshots inmutables en
+tablas exclusivas de Ventas. Se ejecuta cada dos horas y también procesa las
+solicitudes manuales creadas desde el Dashboard.
 
-- No existe todavía una tabla, snapshot, worker ni endpoint de sincronización de Ventas para Compras en Supabase.
-- El Dashboard consulta únicamente `VENTAS!1:2` para leer `FECHA_IMPORTACION` y pintar la frescura de la fuente.
-- Los datos de demanda que realmente afectan el Dashboard (`PROMEDIO_MENSUAL` y `CONSUMO_12_MESES`) siguen llegando dentro de `MODELO_COMPRAS`.
+El snapshot vigente contiene detalle mensual auditable por código, `COD_BAM`,
+empresa y período. La migración `006_compras_ventas_demanda_legacy.sql` expone
+una fila por SKU para la ventana fija agosto 2025–julio 2026. El portal pagina
+esa vista, confirma que no cambió el ID de importación durante la lectura,
+aplica `MAPA_SKU` y sustituye únicamente consumo de doce meses y promedio.
 
-El legacy relevante está en:
+La validación del Hito 2 sobre el snapshot `import_id = 2` confirmó 11.879 SKU
+antes del mapeo y 11.877 después de canonizar. Frente a la hoja `VENTAS`, sólo
+6 SKU difirieron, con una diferencia neta total de 240 unidades. Frente a
+`MODELO_COMPRAS`, 3.459 filas cambian porque el modelo persistido estaba
+desactualizado; 27.177 ya coincidían. No se listaron datos por SKU ni secretos.
 
-- `docs/sistema-importaciones-legacy/importador_ventas.gs`: busca el XLSX más reciente en una carpeta fija de Drive, lo valida, reemplaza completamente `VENTAS`, agrega `ARCHIVO_ORIGEN` y `FECHA_IMPORTACION` y registra el resultado en `LOG_IMPORTACIONES`.
-- `importador_ventas_ui.html`: búsqueda, confirmación y resultado de la importación manual.
-- `ventas_modelo.gs`: detecta automáticamente todos los pares mensuales y construye el modelo de demanda por SKU.
-- `30_admin_ventas.gs`: consulta administrativa de la hoja `VENTAS` y cruce de marca mediante stock.
-
-Formato legacy esperado: `Código`, `Cod_BAM`, `Descripción`; pares dinámicos `MES_AAAA` y `Total_MES_AAAA`; `Total_Unidades_Netas`, `Total_Facturado_Neto_S_IVA`; empresas `DTM`, `IMP`, `JNM`, `NLI`, `NLD`; más `ARCHIVO_ORIGEN` y `FECHA_IMPORTACION` agregados por el importador. Se descartan filas sin `Cod_BAM`, se contabilizan duplicados pero el legacy no los elimina, y la hoja se reemplaza completa.
-
-Existe además una conexión SQL ya operativa para el área Ejecutiva: `bridge/server.mjs` consulta `VS_REPORTING.dbo.Vista_Ventas_origen_v2` cada dos horas y guarda una caché local. Esa consulta actual sólo conserva conteos diarios de renglones/pedidos y familias; **no contiene las unidades, importes ni series mensuales por SKU necesarias para reemplazar `VENTAS`**. Puede reutilizarse su patrón seguro de acceso, pero no su payload actual.
-
-Antes de implementar Ventas hay que confirmar con el usuario:
-
-1. fuente autoritativa nueva: SQL Server/`Vista_Ventas_origen_v2`, otro endpoint o continuar partiendo del XLSX;
-2. significado y mapeo de `articulo` frente a `Cod_BAM` y `Código`, y de `Base_Origen` frente a las cinco empresas;
-3. período histórico requerido, frecuencia y horario de sincronización;
-4. si esta etapa sólo debe crear el snapshot auditable de Ventas y su indicador de frescura, o también sustituir en memoria `PROMEDIO_MENSUAL`/`CONSUMO_12_MESES`;
-5. si el origen SQL es accesible desde GitHub Actions. Si es privado, usar un worker/bridge dentro de la red y no exponer credenciales SQL al portal ni al navegador.
-
-Diseño esperado, sujeto a ese diagnóstico: snapshots inmutables de importación en Supabase, detalle normalizado por SKU y período, errores separados, hash o identificador idempotente, controles de volumen y variación, vista del último snapshot validado y trazabilidad de solicitudes. No reutilizar las tablas de stock: sus restricciones sólo aceptan WMS/OCTOSIS y Warnes/Escobar.
+El próximo hito no debe recalcular todavía riesgo o compra sugerida de forma
+aislada. Primero deben migrarse las fuentes restantes necesarias —en particular
+Stock Escobar y Órdenes— y luego diseñarse el recálculo integral y auditable.
 
 ## Archivos principales
 
@@ -148,11 +144,14 @@ Diseño esperado, sujeto a ese diagnóstico: snapshots inmutables de importació
 - `src/lib/compras-sheets.ts`: acceso a Sheets en servidor, con scope `spreadsheets.readonly`.
 - `src/lib/compras-dashboard.ts`: cálculos puros del Dashboard y utilidades compartidas.
 - `src/lib/compras-stock-supabase.ts`: lectura del snapshot Warnes e inyección en memoria sobre el modelo legacy.
+- `src/lib/compras-ventas-supabase.ts`: lectura paginada y consistente del snapshot vigente de Ventas.
+- `src/lib/compras-ventas-model.ts`: canonización con `MAPA_SKU` e inyección pura de consumo/promedio.
 - `src/lib/compras-sync.ts`: solicitudes de sincronización y dispatch del workflow de Warnes.
+- `bridge/ventas-sync.mjs`: extracción SQL, validación, idempotencia y publicación automática/manual de Ventas.
 - `src/app/api/compras/sync-warnes/route.ts`: endpoint autenticado para iniciar y consultar la sincronización.
 - `workers/wms-stock/wms_stock_sync.py`: automatización productiva WMS → Supabase.
 - `.github/workflows/sync-warnes-stock.yml`: ejecución manual/programada del worker.
-- `supabase/migrations/003_stock_compras.sql` y `004_compras_sync_requests.sql`: persistencia, vistas, seguridad y seguimiento de Warnes.
+- `supabase/migrations/003_stock_compras.sql` a `006_compras_ventas_demanda_legacy.sql`: persistencia, vistas, seguridad y seguimiento independiente de Warnes y Ventas.
 - `src/lib/compras-gestion.ts`: mapeo, filtros y resumen puros de Gestión.
 - `src/app/api/compras/dashboard-export/route.ts`: XLSX del Dashboard, sin escrituras en Google.
 - `tests/compras-dashboard.test.mjs`, `tests/compras-gestion.test.mjs`, `tests/compras-historial.test.mjs`, `tests/compras-envios.test.mjs`, `tests/compras-cotizaciones.test.mjs` y `tests/compras-bandeja.test.mjs`: pruebas de lógica.
@@ -169,7 +168,7 @@ Cotizaciones pasó una comprobación de tipos, ESLint focalizado y una prueba pu
 
 Bandeja de Compra quedó incorporada en la navegación antes de Enviados a Compra. Pasaron la comprobación de tipos, ESLint focalizado y una prueba puntual de elegibilidad, KPIs y cruce de la oferta seleccionada; no se ejecutó una compilación completa. Falta validar visualmente la vista con datos reales del portal. **Enviar a Compra** permanece deshabilitado y no existe una operación de escritura nueva.
 
-La conexión automática completa de Warnes fue confirmada funcionalmente por el usuario el 15/09/2026. Este relevamiento documental no volvió a ejecutar el workflow ni una compilación completa. El árbol de trabajo estaba limpio antes de esta actualización del MD.
+La conexión automática completa de Warnes fue confirmada funcionalmente por el usuario el 15/09/2026. Ventas Hito 2 pasó 7 pruebas focalizadas, TypeScript, ESLint focalizado y `git diff --check`; no se ejecutó una compilación completa. La migración 006 fue aplicada en Supabase y la comparación de sólo lectura contra `VENTAS` confirmó la ventana y la agregación indicadas arriba.
 
 Pendiente de aprobación y definición funcional: conectar **Guardar** de Gestión, **Enviar a Compra** de Bandeja, **Generar OC** de Enviados y los flujos de escritura de Cotizaciones, Compras en Proceso, Packing List, Contenedores y Recepciones. Esas vistas ya existen en modo consulta; sus botones de escritura continúan deshabilitados. No habilitar operaciones remotas de escritura sin implementación real y validación específica.
 
@@ -179,7 +178,7 @@ Este proyecto usa Next.js 16.3.4. Antes de modificar código Next, consultar la 
 
 Para retomar, leer primero este archivo completo y `AGENTS.md`, verificar rama y `git status`, y leer las guías relevantes de `node_modules/next/dist/docs/` antes de tocar código Next.js. El estado base esperado incluye las migraciones `003` y `004`, el workflow `sync-warnes-stock.yml`, el worker `workers/wms-stock/` y el botón de Warnes en el Dashboard.
 
-El siguiente trabajo no es una nueva vista: es la **conexión automática de Ventas**. Proteger la sincronización Warnes ya validada, no cambiar sus tablas o contratos salvo necesidad demostrada y no depender de rutas temporales de capturas. Las conexiones complejas se desarrollan fuente por fuente; después de Ventas quedarán Stock Escobar y Órdenes, y recién con las fuentes necesarias migradas deberá planificarse el reemplazo del cálculo heredado de `MODELO_COMPRAS`.
+Ventas Hitos 1 y 2 están implementados. Proteger tanto su worker local como la sincronización Warnes ya validada y no cambiar sus tablas o contratos salvo necesidad demostrada. Los próximos candidatos son Stock Escobar y Órdenes; recién con las fuentes necesarias migradas debe planificarse el reemplazo integral de riesgo y compra sugerida heredados de `MODELO_COMPRAS`.
 
 ### Prompt sugerido para una conversación nueva
 

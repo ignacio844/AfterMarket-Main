@@ -24,6 +24,10 @@ import {
   getComprasVentasActual,
   ventasFreshnessRows,
 } from "@/lib/compras-ventas-supabase";
+import {
+  applyVentasDemandToDashboardModel,
+  canonicalizeVentasDemand,
+} from "@/lib/compras-ventas-model";
 
 const READ_ONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEET_NAMES = {
@@ -33,6 +37,7 @@ const SHEET_NAMES = {
   controlStock: "CONTROL_IMPORTACIONES_STOCK",
   ventas: "VENTAS",
   logImportaciones: "LOG_IMPORTACIONES",
+  mapaSku: "MAPA_SKU",
   gestion: "GESTION_COMPRAS_ACTIVA",
   gestionHistorial: "GESTION_COMPRAS",
   enviosCompra: "ENVIOS_COMPRA",
@@ -125,7 +130,7 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
 
   const [{ sheets }, warnes, ventas] = await Promise.all([
     readSheets(
-      ["modelo", "config", "alias", "controlStock", "logImportaciones"],
+      ["modelo", "config", "alias", "controlStock", "logImportaciones", "mapaSku"],
       "modelo",
     ),
     getComprasStockWarnesActual(),
@@ -134,7 +139,10 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
 
   const dashboardSheets = {
     ...sheets,
-    modelo: applyWarnesStockToDashboardModel(sheets.modelo, warnes.stockBySku),
+    modelo: applyVentasDemandToDashboardModel(
+      applyWarnesStockToDashboardModel(sheets.modelo, warnes.stockBySku),
+      canonicalizeVentasDemand(ventas.demandaBySku, sheets.mapaSku),
+    ),
     controlStock: applyWarnesImportDateToControlStock(
       sheets.controlStock,
       warnes.fechaImportacion,

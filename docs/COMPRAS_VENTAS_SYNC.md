@@ -2,10 +2,11 @@
 
 ## Alcance
 
-Este documento describe el Hito 1 de la migración de Ventas. La ingesta sólo
-reemplaza la fuente de frescura del Dashboard. `PROMEDIO_MENSUAL`,
-`CONSUMO_12_MESES`, `RIESGO`, `PENDIENTE_TOTAL` y `COMPRA_SUGERIDA` continúan
-leyéndose desde `MODELO_COMPRAS` hasta el Hito 2.
+Este documento describe los Hitos 1 y 2 de la migración de Ventas. La ingesta
+reemplaza la fuente de frescura del Dashboard y el servidor sustituye en memoria
+`CONSUMO_12_MESES` y `PROMEDIO_MENSUAL` con el último snapshot validado.
+`RIESGO`, `PENDIENTE_TOTAL` y `COMPRA_SUGERIDA` continúan leyéndose sin cambios
+desde `MODELO_COMPRAS` hasta el futuro recálculo integral del modelo.
 
 La fuente autoritativa es `VS_REPORTING.dbo.Vista_Ventas_origen_v2`. El worker
 replica la transformación de `SQL_Bajada_Mensual_Facturaciónv2.sql`:
@@ -58,7 +59,25 @@ configuración privada de Supabase está disponible.
 - `compras_ventas_import_errors`: códigos descartados y errores técnicos.
 - `compras_ventas_actual_import`: último snapshot validado.
 - `compras_ventas_actual_mensual`: detalle vigente.
-- `compras_ventas_actual_por_sku`: consolidación futura para el Hito 2.
+- `compras_ventas_actual_por_sku`: consolidación mensual vigente por SKU.
+- `compras_ventas_demanda_legacy`: suma por SKU de agosto de 2025 a julio de
+  2026 y promedio mensual dividido por 12, utilizada por el Hito 2.
+
+## Lectura del Dashboard (Hito 2)
+
+El servidor conserva `MODELO_COMPRAS` como estructura de filas, aplica primero
+el stock WARNES vigente y luego reemplaza únicamente estas dos columnas:
+
+- `CONSUMO_12_MESES`: suma de unidades netas entre agosto de 2025 y julio de
+  2026, ambos inclusive;
+- `PROMEDIO_MENSUAL`: esa suma dividida por 12.
+
+El cruce usa la misma normalización y el mismo `MAPA_SKU` del legacy: cada
+`COD_BAM` se resuelve primero contra `CODIGO_NUEVO`, `CODIGO_VIEJO` y las bases
+de equivalencias, y las demandas que convergen al mismo SKU se suman. Un SKU del
+modelo que no aparece en el snapshot completo recibe consumo y promedio cero.
+La operación es de sólo lectura: no escribe Google Sheets ni expone
+credenciales al navegador.
 
 RLS está activo y `anon`/`authenticated` no tienen permisos. El navegador sólo
 recibe el estado de la solicitud y el resumen de frescura preparado por el
