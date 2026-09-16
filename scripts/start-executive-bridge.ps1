@@ -84,6 +84,20 @@ function Start-OrdenesBridge {
   Write-SupervisorLog 'Worker de Órdenes iniciado en 8792.'
 }
 
+function Start-ComprasSheetsBridge {
+  if (-not (Test-Path -LiteralPath $portalEnvironment)) {
+    throw "No se encontró $portalEnvironment"
+  }
+  Start-NodeProcess -WorkingDirectory $projectRoot -Arguments @('--env-file=.env.local', 'bridge/compras-sheets-sync.mjs') -LogPrefix 'compras-sheets-bridge'
+  Write-SupervisorLog 'Espejo de Sheets de Compras iniciado en 8793.'
+}
+
+function Test-ComprasSheetsConfigured {
+  if (-not (Test-EscobarConfigured)) { return $false }
+  $content = Get-Content -LiteralPath $portalEnvironment
+  return [bool]($content | Where-Object { $_ -match '^\s*GOOGLE_SHEETS_SPREADSHEET_ID\s*=\s*\S+' } | Select-Object -First 1)
+}
+
 function Test-VentasConfigured {
   if (-not (Test-Path -LiteralPath $portalEnvironment)) { return $false }
   $content = Get-Content -LiteralPath $portalEnvironment
@@ -156,6 +170,9 @@ while ($true) {
   if (Test-EscobarConfigured) {
     Ensure-Service -HealthUri 'http://127.0.0.1:8791/health' -StartAction ${function:Start-EscobarBridge} -ServiceName 'worker de Escobar'
     Ensure-Service -HealthUri 'http://127.0.0.1:8792/health' -StartAction ${function:Start-OrdenesBridge} -ServiceName 'worker de Órdenes'
+  }
+  if (Test-ComprasSheetsConfigured) {
+    Ensure-Service -HealthUri 'http://127.0.0.1:8793/health' -StartAction ${function:Start-ComprasSheetsBridge} -ServiceName 'espejo de Sheets de Compras'
   }
   Ensure-Service -HealthUri 'http://127.0.0.1:8790/health' -StartAction ${function:Start-Gateway} -ServiceName 'gateway compartido'
 

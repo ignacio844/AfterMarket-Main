@@ -15,6 +15,10 @@
     "bridge:escobar:dry-run": "node --env-file=.env.local bridge/escobar-sync.mjs --dry-run",
     "bridge:ordenes": "node --env-file=.env.local bridge/ordenes-sync.mjs",
     "bridge:ordenes:once": "node --env-file=.env.local bridge/ordenes-sync.mjs --once",
+    "bridge:compras-sheets": "node --env-file=.env.local bridge/compras-sheets-sync.mjs",
+    "bridge:compras-sheets:once": "node --env-file=.env.local bridge/compras-sheets-sync.mjs --once",
+    "bridge:compras-sheets:dry-run": "node --env-file=.env.local bridge/compras-sheets-sync.mjs --dry-run",
+    "bridge:compras-pending:report": "node --env-file=.env.local bridge/compras-pending-report.mjs",
     "bridge:supervise": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-executive-bridge.ps1",
     "bridge:install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/register-executive-bridge-task.ps1"
   },

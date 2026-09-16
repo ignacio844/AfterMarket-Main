@@ -30,6 +30,9 @@ import {
   canonicalizeVentasDemand,
 } from "@/lib/compras-ventas-model";
 import { getOrdenesFreshnessRows } from "@/lib/compras-ordenes-supabase";
+import { reconcileComprasPending, type PendingReconciliation } from "@/lib/compras-pending-reconciliation";
+import { applyLegacyComprasMetricsToDashboardModel } from "@/lib/compras-dashboard-model";
+import { readComprasMirroredSheets } from "@/lib/compras-sheet-supabase";
 
 const READ_ONLY_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
 const SHEET_NAMES = {
@@ -55,6 +58,10 @@ const SHEET_NAMES = {
   ordenes: "ORDENES",
   historialLogistica: "HISTORIAL_ESTADOS_LOGISTICA",
   detalleImportaciones: "DETALLE_IMPORTACIONES",
+  pendientesEquivalencia: "PENDIENTES_EQUIVALENCIA_IMPORT",
+  equivalenciasSku: "EQUIVALENCIAS_SKU",
+  parametros: "PARAMETROS_COMPRAS",
+  marcas: "MARCAS",
 } as const;
 
 type SheetMetadata = { properties?: { timeZone?: string }; sheets?: Array<{ properties?: { title?: string } }> };
@@ -88,7 +95,7 @@ async function googleGet<T>(url: URL, accessToken: string): Promise<T> {
 
 type SheetKey = keyof typeof SHEET_NAMES;
 
-async function readSheets<const K extends SheetKey>(keys: readonly K[], required: K | null): Promise<{ sheets: Record<K, SheetRows>; timeZone: string }> {
+async function readSheets<const K extends SheetKey>(keys: readonly K[], required: K | null): Promise<{ sheets: Record<K, SheetRows>; timeZone: string; batchId: null }> {
   const { spreadsheetId, email, key } = settings();
   const client = new JWT({ email, key, scopes: [READ_ONLY_SCOPE] });
   let token: string | null | undefined;
@@ -109,7 +116,7 @@ async function readSheets<const K extends SheetKey>(keys: readonly K[], required
   const present = keys.filter((keyName) => available.has(SHEET_NAMES[keyName]));
   const result = Object.fromEntries(keys.map((keyName) => [keyName, [] as SheetRows])) as Record<K, SheetRows>;
   if (present.length === 0) {
-    return { sheets: result, timeZone: metadata.properties?.timeZone || "America/Argentina/Buenos_Aires" };
+    return { sheets: result, timeZone: metadata.properties?.timeZone || "America/Argentina/Buenos_Aires", batchId: null };
   }
   const valuesUrl = new URL(`${base}/values:batchGet`);
   valuesUrl.searchParams.set("valueRenderOption", "UNFORMATTED_VALUE");
@@ -122,7 +129,7 @@ async function readSheets<const K extends SheetKey>(keys: readonly K[], required
   present.forEach((keyName, index) => {
     result[keyName] = response.valueRanges?.[index]?.values ?? [];
   });
-  return { sheets: result, timeZone: metadata.properties?.timeZone || "America/Argentina/Buenos_Aires" };
+  return { sheets: result, timeZone: metadata.properties?.timeZone || "America/Argentina/Buenos_Aires", batchId: null };
 }
 
 export async function getComprasDashboard(): Promise<ComprasDashboard> {
@@ -131,8 +138,8 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
 
   const [{ sheets }, warnes, ventas, ordenes] = await Promise.all([
-    readSheets(
-      ["modelo", "config", "alias", "controlStock", "mapaSku"],
+    readDashboardSheets(
+      ["modelo", "config", "alias", "controlStock", "mapaSku", "detalleImportaciones", "pendientesEquivalencia", "parametros", "marcas"],
       "modelo",
     ),
     getComprasStockWarnesActual(),
@@ -140,16 +147,24 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
     getOrdenesFreshnessRows(),
   ]);
 
+  const updatedModel = applyVentasDemandToDashboardModel(
+    applyWarnesStockToDashboardModel(
+      sheets.modelo,
+      warnes.stockBySku,
+      warnes.importIdEscobar ? warnes.stockEscobarBySku : undefined,
+    ),
+    canonicalizeVentasDemand(ventas.demandaBySku, sheets.mapaSku),
+  );
   const dashboardSheets = {
     ...sheets,
-    modelo: applyVentasDemandToDashboardModel(
-      applyWarnesStockToDashboardModel(
-        sheets.modelo,
-        warnes.stockBySku,
-        warnes.importIdEscobar ? warnes.stockEscobarBySku : undefined,
-      ),
-      canonicalizeVentasDemand(ventas.demandaBySku, sheets.mapaSku),
-    ),
+    modelo: applyLegacyComprasMetricsToDashboardModel({
+      modelo: updatedModel,
+      detalle: sheets.detalleImportaciones,
+      mapaSku: sheets.mapaSku,
+      pendientesEquivalencia: sheets.pendientesEquivalencia,
+      parametros: sheets.parametros,
+      marcas: sheets.marcas,
+    }),
     controlStock: applyEscobarImportDateToControlStock(
       applyWarnesImportDateToControlStock(sheets.controlStock, warnes.fechaImportacion),
       warnes.fechaImportacionEscobar,
@@ -159,6 +174,30 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
   };
 
   return calculateComprasDashboard(dashboardSheets, email);
+}
+
+export async function getComprasPendingReconciliation(): Promise<PendingReconciliation & { sourceBatchId: number | null; analyzedAt: string }> {
+  const email = (await auth())?.user?.email;
+  if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
+  const { sheets, batchId } = await readDashboardSheets(
+    ["modelo", "detalleImportaciones", "mapaSku", "pendientesEquivalencia", "equivalenciasSku", "ordenes"],
+    "detalleImportaciones",
+  );
+  const report = reconcileComprasPending({
+    modelo: sheets.modelo,
+    detalle: sheets.detalleImportaciones,
+    mapaSku: sheets.mapaSku,
+    pendientesEquivalencia: sheets.pendientesEquivalencia,
+    equivalenciasSku: sheets.equivalenciasSku,
+    ordenes: sheets.ordenes,
+  });
+  return { ...report, sourceBatchId: batchId, analyzedAt: new Date().toISOString() };
+}
+
+function readDashboardSheets<const K extends SheetKey>(keys: readonly K[], required: K | null) {
+  return process.env.COMPRAS_DASHBOARD_SHEET_SOURCE === "SHEETS"
+    ? readSheets(keys, required)
+    : readComprasMirroredSheets(SHEET_NAMES, keys, required);
 }
 
 export async function getComprasGestion(): Promise<ComprasGestion> {

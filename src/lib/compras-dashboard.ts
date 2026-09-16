@@ -1,5 +1,5 @@
-// Port of the read-only Dashboard in portal_compras.gs. The upstream model is
-// deliberately treated as stored data; this module never recalculates it.
+// Read-only port of the Dashboard aggregation in portal_compras.gs. The caller
+// supplies an in-memory model recalculated from current source snapshots.
 export type SheetValue = string | number | boolean | null;
 export type SheetRows = SheetValue[][];
 
