@@ -27,7 +27,7 @@ Register-ScheduledTask `
   -Trigger $trigger `
   -Settings $settings `
   -Principal $principal `
-  -Description 'Mantiene disponibles el bridge SQL ejecutivo y el worker interno de Ventas.' `
+  -Description 'Mantiene disponibles los bridges Ejecutivo, Ventas y Escobar.' `
   -Force | Out-Null
 
 Start-ScheduledTask -TaskName $taskName

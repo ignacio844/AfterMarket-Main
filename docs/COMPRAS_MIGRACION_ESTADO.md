@@ -8,7 +8,7 @@ Se está migrando el sistema de Compras de Google Apps Script + Google Sheets (f
 
 Google Sheets continúa como fuente temporal **solo de lectura** para los datos todavía no migrados. Toda llamada a Google y el uso de credenciales ocurren del lado servidor. Se usa exclusivamente la autenticación del portal actual (NextAuth con Google y `isPortalUserAllowed`). No se escribe en Sheets ni se ejecuta o porta allí ningún proceso que recalcule `MODELO_COMPRAS`.
 
-La migración de fuentes automatizadas ya comenzó. **Stock Warnes está migrado a Supabase y su sincronización automática fue validada por el usuario como efectiva al 100 %.** Ventas también dispone de ingesta SQL automática/manual, snapshots auditables y sustitución en memoria de la demanda legacy. Ninguno de los dos flujos escribe Google Sheets.
+La migración de fuentes automatizadas ya comenzó. **Stock Warnes está migrado a Supabase y su sincronización automática fue validada por el usuario como efectiva al 100 %.** Ventas dispone de ingesta SQL automática/manual y Escobar de ingesta diaria temporal desde un XLSX de Drive. Ninguno de los flujos escribe Google Sheets.
 
 No modificar otras secciones del portal salvo lo estrictamente necesario para Compras. La UI debe seguir la estética de Grupo Aftermarket, sin copiar visualmente el sistema legacy.
 
@@ -47,15 +47,15 @@ El Dashboard en `/areas/compras` conserva la lógica de `obtenerDashboardPortalC
 
 La fuente es actualmente **híbrida**:
 
-1. `src/lib/compras-sheets.ts` lee en paralelo Google Sheets y los snapshots vigentes de Warnes y Ventas en Supabase.
+1. `src/lib/compras-sheets.ts` lee en paralelo Google Sheets y los snapshots vigentes de Warnes, Escobar y Ventas en Supabase.
 2. Desde Sheets obtiene `MODELO_COMPRAS`, configuración y alias de marcas, `MAPA_SKU`, `CONTROL_IMPORTACIONES_STOCK` y `LOG_IMPORTACIONES`.
 3. `src/lib/compras-stock-supabase.ts` pagina la vista `compras_stock_actual_por_sku` de Supabase y obtiene `stock_warnes`, fecha e ID de importación.
-4. Antes de calcular el Dashboard, `applyWarnesStockToDashboardModel()` reemplaza en memoria `STOCK_WARNES` por SKU. Si un SKU del modelo no existe en el snapshot completo, su Warnes actual se considera `0`. Luego recalcula únicamente `STOCK_TOTAL = WARNES Supabase + ESCOBAR Sheets`.
-5. `applyWarnesImportDateToControlStock()` reemplaza en memoria la fecha de Warnes para que la tarjeta de frescura refleje la importación real de Supabase.
+4. Antes de calcular el Dashboard, `applyWarnesStockToDashboardModel()` reemplaza en memoria `STOCK_WARNES` y, cuando existe un snapshot Escobar validado, también `STOCK_ESCOBAR` por SKU. Un SKU ausente del snapshot completo de su depósito se considera `0`. Luego recalcula `STOCK_TOTAL` con ambos depósitos de Supabase; sin snapshot Escobar conserva el valor legacy.
+5. Las fechas de importación de Warnes y Escobar se reemplazan en memoria para que las tarjetas de frescura reflejen los snapshots reales de Supabase.
 6. `src/lib/compras-ventas-model.ts` aplica `MAPA_SKU` como el legacy y reemplaza en memoria sólo `CONSUMO_12_MESES` (agosto 2025 a julio 2026) y `PROMEDIO_MENSUAL` (suma / 12) desde Supabase.
 7. `calculateComprasDashboard()` calcula agrupaciones y KPIs sin modificar ninguna fuente.
 
-**Límite importante del estado actual:** `RIESGO`, `PENDIENTE_TOTAL` y `COMPRA_SUGERIDA` todavía provienen de las columnas ya calculadas de `MODELO_COMPRAS` en Sheets. No se recalculan automáticamente aunque hayan cambiado Warnes o la demanda. Ese recálculo integral queda para un hito posterior, cuando estén migradas las demás fuentes necesarias.
+**Límite importante del estado actual:** `RIESGO`, `PENDIENTE_TOTAL` y `COMPRA_SUGERIDA` todavía provienen de las columnas ya calculadas de `MODELO_COMPRAS` en Sheets. No se recalculan automáticamente aunque hayan cambiado Warnes, Escobar o la demanda. Ese recálculo integral queda para un hito posterior, cuando estén migradas las demás fuentes necesarias.
 
 ## Sincronización automática de Stock Warnes — completada
 
@@ -123,8 +123,24 @@ antes del mapeo y 11.877 después de canonizar. Frente a la hoja `VENTAS`, sólo
 desactualizado; 27.177 ya coincidían. No se listaron datos por SKU ni secretos.
 
 El próximo hito no debe recalcular todavía riesgo o compra sugerida de forma
-aislada. Primero deben migrarse las fuentes restantes necesarias —en particular
-Stock Escobar y Órdenes— y luego diseñarse el recálculo integral y auditable.
+aislada. Tras la incorporación temporal de Stock Escobar, queda migrar Órdenes
+y luego diseñar el recálculo integral y auditable.
+
+## Stock Escobar — integración temporal Octosis/Drive
+
+El worker local `bridge/escobar-sync.mjs` lee diariamente, desde las 09:00 de
+Argentina, el XLSX de inventario en una carpeta de Drive compartida en modo
+lector con la cuenta de servicio. Filtra los depósitos que contienen `EXT`,
+`REV`, `INV` o `TEP`, suma `Saldo` por `Código` (SKU BAM), valida volumen y
+variación, y publica en las tablas de stock existentes con
+`source_system=OCTOSIS` y `deposito=ESCOBAR`. No toca el snapshot Warnes.
+
+El primer snapshot, importación #5, quedó `VALIDADO` el 16/09/2026 con 14.010
+SKU y 7.515.104 unidades; se confirmó que Warnes #4 seguía validado. El
+health check local respondió correctamente en `127.0.0.1:8791/health`.
+La carpeta de septiembre está configurada; al crear la de octubre hay que
+concederle lectura a la cuenta de servicio y actualizar
+`ESCOBAR_DRIVE_FOLDER_ID`. Véase `docs/COMPRAS_ESCOBAR_SYNC.md`.
 
 ## Archivos principales
 
@@ -148,6 +164,7 @@ Stock Escobar y Órdenes— y luego diseñarse el recálculo integral y auditabl
 - `src/lib/compras-ventas-model.ts`: canonización con `MAPA_SKU` e inyección pura de consumo/promedio.
 - `src/lib/compras-sync.ts`: solicitudes de sincronización y dispatch del workflow de Warnes.
 - `bridge/ventas-sync.mjs`: extracción SQL, validación, idempotencia y publicación automática/manual de Ventas.
+- `bridge/escobar-sync.mjs` y `bridge/escobar-parse.mjs`: detección diaria en Drive, parser XLSX y publicación de Escobar.
 - `src/app/api/compras/sync-warnes/route.ts`: endpoint autenticado para iniciar y consultar la sincronización.
 - `workers/wms-stock/wms_stock_sync.py`: automatización productiva WMS → Supabase.
 - `.github/workflows/sync-warnes-stock.yml`: ejecución manual/programada del worker.
@@ -168,7 +185,7 @@ Cotizaciones pasó una comprobación de tipos, ESLint focalizado y una prueba pu
 
 Bandeja de Compra quedó incorporada en la navegación antes de Enviados a Compra. Pasaron la comprobación de tipos, ESLint focalizado y una prueba puntual de elegibilidad, KPIs y cruce de la oferta seleccionada; no se ejecutó una compilación completa. Falta validar visualmente la vista con datos reales del portal. **Enviar a Compra** permanece deshabilitado y no existe una operación de escritura nueva.
 
-La conexión automática completa de Warnes fue confirmada funcionalmente por el usuario el 15/09/2026. Ventas Hito 2 pasó 7 pruebas focalizadas, TypeScript, ESLint focalizado y `git diff --check`; no se ejecutó una compilación completa. La migración 006 fue aplicada en Supabase y la comparación de sólo lectura contra `VENTAS` confirmó la ventana y la agregación indicadas arriba.
+La conexión automática completa de Warnes fue confirmada funcionalmente por el usuario el 15/09/2026. Ventas Hito 2 pasó 7 pruebas focalizadas, TypeScript, ESLint focalizado y `git diff --check`; no se ejecutó una compilación completa. Escobar pasó una extracción de sólo lectura real desde Drive, validó y publicó el snapshot #5; el worker local quedó ejecutándose. No se hizo una compilación completa.
 
 Pendiente de aprobación y definición funcional: conectar **Guardar** de Gestión, **Enviar a Compra** de Bandeja, **Generar OC** de Enviados y los flujos de escritura de Cotizaciones, Compras en Proceso, Packing List, Contenedores y Recepciones. Esas vistas ya existen en modo consulta; sus botones de escritura continúan deshabilitados. No habilitar operaciones remotas de escritura sin implementación real y validación específica.
 
@@ -178,7 +195,7 @@ Este proyecto usa Next.js 16.3.4. Antes de modificar código Next, consultar la 
 
 Para retomar, leer primero este archivo completo y `AGENTS.md`, verificar rama y `git status`, y leer las guías relevantes de `node_modules/next/dist/docs/` antes de tocar código Next.js. El estado base esperado incluye las migraciones `003` y `004`, el workflow `sync-warnes-stock.yml`, el worker `workers/wms-stock/` y el botón de Warnes en el Dashboard.
 
-Ventas Hitos 1 y 2 están implementados. Proteger tanto su worker local como la sincronización Warnes ya validada y no cambiar sus tablas o contratos salvo necesidad demostrada. Los próximos candidatos son Stock Escobar y Órdenes; recién con las fuentes necesarias migradas debe planificarse el reemplazo integral de riesgo y compra sugerida heredados de `MODELO_COMPRAS`.
+Ventas Hitos 1 y 2 y la ingesta temporal de Escobar están implementados. Proteger sus workers locales y la sincronización Warnes ya validada. El siguiente candidato es Órdenes; recién con las fuentes necesarias migradas debe planificarse el reemplazo integral de riesgo y compra sugerida heredados de `MODELO_COMPRAS`.
 
 ### Prompt sugerido para una conversación nueva
 

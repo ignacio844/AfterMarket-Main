@@ -5,8 +5,11 @@ import type { SheetRows, SheetValue } from "@/lib/compras-dashboard";
 
 export type ComprasStockWarnesActual = {
   stockBySku: Map<string, number>;
+  stockEscobarBySku: Map<string, number>;
   fechaImportacion: string | null;
+  fechaImportacionEscobar: string | null;
   importId: number | null;
+  importIdEscobar: number | null;
 };
 
 function normalizeSku(value: unknown) {
@@ -36,15 +39,19 @@ export async function getComprasStockWarnesActual(): Promise<ComprasStockWarnesA
   const supabase = getSupabaseAdmin();
 
   const stockBySku = new Map<string, number>();
+  const stockEscobarBySku = new Map<string, number>();
   let fechaImportacion: string | null = null;
+  let fechaImportacionEscobar: string | null = null;
   let importId: number | null = null;
+  let importIdEscobar: number | null = null;
 
   const PAGE_SIZE = 1000;
 
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await supabase
       .from("compras_stock_actual_por_sku")
-      .select("sku,stock_warnes,fecha_stock_warnes,import_id_warnes")
+      .select("sku,stock_warnes,stock_escobar,fecha_stock_warnes,fecha_stock_escobar,import_id_warnes,import_id_escobar")
+      .order("sku")
       .range(from, from + PAGE_SIZE - 1);
 
     if (error) {
@@ -57,7 +64,12 @@ export async function getComprasStockWarnesActual(): Promise<ComprasStockWarnesA
       const sku = normalizeSku(row.sku);
       if (!sku) continue;
 
-      stockBySku.set(sku, numberValue(row.stock_warnes));
+      if (row.import_id_warnes !== null && row.import_id_warnes !== undefined) {
+        stockBySku.set(sku, numberValue(row.stock_warnes));
+      }
+      if (row.import_id_escobar !== null && row.import_id_escobar !== undefined) {
+        stockEscobarBySku.set(sku, numberValue(row.stock_escobar));
+      }
 
       if (!fechaImportacion && row.fecha_stock_warnes) {
         fechaImportacion = String(row.fecha_stock_warnes);
@@ -65,6 +77,16 @@ export async function getComprasStockWarnesActual(): Promise<ComprasStockWarnesA
 
       if (importId === null && row.import_id_warnes !== null && row.import_id_warnes !== undefined) {
         importId = Number(row.import_id_warnes);
+      } else if (row.import_id_warnes != null && importId !== Number(row.import_id_warnes)) {
+        throw new Error("El snapshot WARNES cambió durante la lectura. Reintentá la carga del Dashboard.");
+      }
+      if (!fechaImportacionEscobar && row.fecha_stock_escobar) {
+        fechaImportacionEscobar = String(row.fecha_stock_escobar);
+      }
+      if (importIdEscobar === null && row.import_id_escobar !== null && row.import_id_escobar !== undefined) {
+        importIdEscobar = Number(row.import_id_escobar);
+      } else if (row.import_id_escobar != null && importIdEscobar !== Number(row.import_id_escobar)) {
+        throw new Error("El snapshot ESCOBAR cambió durante la lectura. Reintentá la carga del Dashboard.");
       }
     }
 
@@ -77,12 +99,13 @@ export async function getComprasStockWarnesActual(): Promise<ComprasStockWarnesA
     );
   }
 
-  return { stockBySku, fechaImportacion, importId };
+  return { stockBySku, stockEscobarBySku, fechaImportacion, fechaImportacionEscobar, importId, importIdEscobar };
 }
 
 export function applyWarnesStockToDashboardModel(
   modelo: SheetRows,
   stockBySku: Map<string, number>,
+  stockEscobarBySku?: Map<string, number>,
 ): SheetRows {
   if (modelo.length < 2) return modelo;
 
@@ -103,6 +126,9 @@ export function applyWarnesStockToDashboardModel(
       "MODELO_COMPRAS debe contener STOCK_WARNES para reemplazarlo por Supabase.",
     );
   }
+  if (stockEscobarBySku && escobarIndex < 0) {
+    throw new Error("MODELO_COMPRAS debe contener STOCK_ESCOBAR para reemplazarlo por Supabase.");
+  }
 
   for (let rowIndex = 2; rowIndex < result.length; rowIndex += 1) {
     const row = result[rowIndex];
@@ -114,9 +140,12 @@ export function applyWarnesStockToDashboardModel(
     const warnes = stockBySku.get(sku) ?? 0;
     row[warnesIndex] = warnes;
 
-    // Durante la transición ESCOBAR sigue viniendo del modelo legacy.
-    // Recalculamos únicamente STOCK_TOTAL para que el Dashboard utilice
-    // WARNES de Supabase + ESCOBAR de Sheets.
+    if (stockEscobarBySku) {
+      row[escobarIndex] = stockEscobarBySku.get(sku) ?? 0;
+    }
+
+    // Sin snapshot Escobar validado se conserva el valor legacy de Sheets.
+    // Cuando existe, ambos depósitos se leen exclusivamente de Supabase.
     if (totalIndex >= 0 && escobarIndex >= 0) {
       row[totalIndex] = warnes + numberValue(row[escobarIndex]);
     }
@@ -129,12 +158,27 @@ export function applyWarnesImportDateToControlStock(
   controlStock: SheetRows,
   fechaImportacion: string | null,
 ): SheetRows {
+  return applyStockImportDateToControlStock(controlStock, "WARNES", fechaImportacion);
+}
+
+export function applyEscobarImportDateToControlStock(
+  controlStock: SheetRows,
+  fechaImportacion: string | null,
+): SheetRows {
+  return applyStockImportDateToControlStock(controlStock, "ESCOBAR", fechaImportacion);
+}
+
+function applyStockImportDateToControlStock(
+  controlStock: SheetRows,
+  depositoNombre: "WARNES" | "ESCOBAR",
+  fechaImportacion: string | null,
+): SheetRows {
   if (!fechaImportacion) return controlStock;
 
   if (!controlStock.length) {
     return [
       ["DEPOSITO", "ULTIMA_IMPORTACION"],
-      ["WARNES", fechaImportacion],
+      [depositoNombre, fechaImportacion],
     ];
   }
 
@@ -152,7 +196,7 @@ export function applyWarnesImportDateToControlStock(
       .trim()
       .toUpperCase();
 
-    if (deposito.includes("WARNES")) {
+    if (deposito.includes(depositoNombre)) {
       result[rowIndex][fechaIndex] = fechaImportacion;
       updated = true;
       break;
@@ -161,7 +205,7 @@ export function applyWarnesImportDateToControlStock(
 
   if (!updated) {
     const row: SheetValue[] = Array.from({ length: result[0].length }, () => "");
-    row[depositoIndex] = "WARNES";
+    row[depositoIndex] = depositoNombre;
     row[fechaIndex] = fechaImportacion;
     result.push(row);
   }

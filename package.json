@@ -10,6 +10,9 @@
     "bridge:start": "node --env-file=.env.bridge bridge/server.mjs",
     "bridge:ventas": "node --env-file=.env.local --env-file=.env.bridge bridge/ventas-sync.mjs",
     "bridge:ventas:dry-run": "node --env-file=.env.local --env-file=.env.bridge bridge/ventas-sync.mjs --dry-run",
+    "bridge:escobar": "node --env-file=.env.local bridge/escobar-sync.mjs",
+    "bridge:escobar:once": "node --env-file=.env.local bridge/escobar-sync.mjs --once",
+    "bridge:escobar:dry-run": "node --env-file=.env.local bridge/escobar-sync.mjs --dry-run",
     "bridge:supervise": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-executive-bridge.ps1",
     "bridge:install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/register-executive-bridge-task.ps1"
   },

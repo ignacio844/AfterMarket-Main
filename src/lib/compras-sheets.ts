@@ -16,6 +16,7 @@ import { calculateComprasSeguimiento, type ComprasSeguimiento } from "@/lib/comp
 import { calculateComprasRecepciones, type ComprasRecepciones } from "@/lib/compras-recepciones";
 import { calculateComprasTransferencias, type ComprasTransferencias } from "@/lib/compras-transferencias";
 import {
+  applyEscobarImportDateToControlStock,
   applyWarnesImportDateToControlStock,
   applyWarnesStockToDashboardModel,
   getComprasStockWarnesActual,
@@ -140,12 +141,16 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
   const dashboardSheets = {
     ...sheets,
     modelo: applyVentasDemandToDashboardModel(
-      applyWarnesStockToDashboardModel(sheets.modelo, warnes.stockBySku),
+      applyWarnesStockToDashboardModel(
+        sheets.modelo,
+        warnes.stockBySku,
+        warnes.importIdEscobar ? warnes.stockEscobarBySku : undefined,
+      ),
       canonicalizeVentasDemand(ventas.demandaBySku, sheets.mapaSku),
     ),
-    controlStock: applyWarnesImportDateToControlStock(
-      sheets.controlStock,
-      warnes.fechaImportacion,
+    controlStock: applyEscobarImportDateToControlStock(
+      applyWarnesImportDateToControlStock(sheets.controlStock, warnes.fechaImportacion),
+      warnes.fechaImportacionEscobar,
     ),
     ventas: ventasFreshnessRows(ventas.fechaImportacion),
   };
