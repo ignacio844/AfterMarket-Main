@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowDownRight, Boxes, Clock3, PackageCheck, ShoppingCart, TrendingUp } from "lucide-react";
+import { AlertCircle, ArrowDownRight, Boxes, PackageCheck, ShoppingCart, TrendingUp } from "lucide-react";
 import { auth } from "@/auth";
 import { ComprasDashboardActions } from "@/components/compras-dashboard-actions";
 import { ComprasWarnesSyncButton } from "@/components/compras-warnes-sync-button";
@@ -59,24 +59,47 @@ function SourceStatus({
   source: DashboardSource;
   action?: ReactNode;
 }) {
-  const tone = source.icono === "🟢"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-    : source.icono === "🟡"
-      ? "border-amber-200 bg-amber-50 text-amber-800"
-      : source.icono === "🔴"
-        ? "border-red-200 bg-red-50 text-red-800"
-        : "border-[var(--line)] bg-[var(--soft)] text-[var(--muted)]";
+  const connected = source.icono === "🟢";
+  const warning = source.icono === "🟡";
+  const offline = source.icono === "🔴";
+  const [fechaOriginal = source.fecha, hora = ""] = source.fecha
+    .trim()
+    .split(/\s+(?=\d{1,2}:\d{2}(?::\d{2})?$)/);
+
+  const fecha = fechaOriginal.replace(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/,
+    (_, dia, mes, anio) => `${dia}/${mes}/${anio.slice(-2)}`,
+  );
+
+  const tone = connected
+    ? "source-card-connected text-emerald-950"
+    : warning
+      ? "bg-gradient-to-br from-amber-50 to-amber-100/60 text-amber-900"
+      : offline
+        ? "bg-gradient-to-br from-red-50 to-red-100/60 text-red-900"
+        : "bg-[var(--soft)] text-[var(--ink)]";
+
+  const dotTone = connected
+    ? "source-connection-dot bg-emerald-500"
+    : warning
+      ? "bg-amber-400"
+      : offline
+        ? "bg-red-500"
+        : "bg-slate-400";
 
   return (
-    <div className={`flex min-w-0 items-center justify-between gap-3 rounded-2xl border px-4 py-3 ${tone}`}>
-      <div className="flex min-w-0 items-center gap-3">
-        <span aria-hidden="true" className="text-sm">{source.icono}</span>
-        <div className="min-w-0">
-          <p className="truncate text-[10px] font-bold uppercase tracking-[0.13em]">{label}</p>
-          <p className="mt-1 truncate text-xs font-semibold">{source.fecha}</p>
-        </div>
+    <div className={`flex min-w-0 items-center gap-2 rounded-2xl px-3 py-2.5 transition ${tone}`}>
+      <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${dotTone}`} />
+
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 whitespace-nowrap">
+        <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.08em] text-current">
+          {label}
+        </span>
+        <span className="min-w-0 shrink text-[10px] font-medium text-current/55">
+          {fecha}{hora ? ` ${hora}` : ""}
+        </span>
+        {action ? <div className="ml-auto shrink-0">{action}</div> : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -96,13 +119,13 @@ function Kpi({ label, value, detail, tone = "blue", icon: Icon }: {
     blue: "bg-[var(--navy-soft)] text-[var(--blue)]",
   };
   return (
-    <article className="flex min-h-36 flex-col justify-between rounded-[22px] border border-[var(--line)] bg-white p-5 shadow-[0_10px_24px_-22px_rgba(14,40,65,0.38)]">
+    <article className="flex min-h-24 flex-col justify-between rounded-[18px] border border-[var(--line)] bg-white px-4.5 py-3.5 shadow-[0_10px_24px_-22px_rgba(14,40,65,0.38)]">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[var(--muted)]">{label}</p>
-        <span className={`grid size-8 shrink-0 place-items-center rounded-xl ${colors[tone]}`}><Icon aria-hidden="true" className="size-4" strokeWidth={1.8} /></span>
+        <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-[var(--muted)]">{label}</p>
+        <span className={`grid size-6.5 shrink-0 place-items-center rounded-lg ${colors[tone]}`}><Icon aria-hidden="true" className="size-4" strokeWidth={1.8} /></span>
       </div>
       <div>
-        <p className="text-[30px] font-semibold tracking-[-0.045em] tabular-nums text-[var(--navy)]">{value}</p>
+        <p className="text-[26px] font-semibold tracking-[-0.045em] tabular-nums text-[var(--navy)]">{value}</p>
         {detail && <p className="mt-1 text-[11px] text-[var(--muted)]">{detail}</p>}
       </div>
     </article>
@@ -113,13 +136,11 @@ function BrandsTable({ title, subtitle, brands }: { title: string; subtitle: str
   const visible = brands.slice(0, 30);
   return (
     <section className="overflow-hidden rounded-[24px] border border-[var(--line)] bg-white" aria-label={title}>
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--line)] px-5 py-5 sm:px-6">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Análisis por origen</p>
-          <h2 className="mt-1 text-xl font-semibold tracking-[-0.025em] text-[var(--navy)]">{title}</h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">{subtitle}</p>
-        </div>
-        <span className="rounded-full bg-[var(--soft)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)]">{number(brands.length)} marcas</span>
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-2.5 sm:px-6">
+        <h2 className="text-xl font-semibold tracking-[-0.025em] text-[var(--navy)]">{title}</h2>
+        <span className="shrink-0 rounded-lg bg-[var(--soft)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)]">
+          {subtitle}
+        </span>
       </div>
       {visible.length === 0 ? (
         <div className="px-6 py-12 text-center text-sm text-[var(--muted)]">No hay marcas habilitadas en este origen.</div>
@@ -128,27 +149,27 @@ function BrandsTable({ title, subtitle, brands }: { title: string; subtitle: str
           <table className="w-full min-w-[940px] border-collapse text-left text-xs">
             <thead className="bg-[var(--soft)] text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">
               <tr>
-                <th scope="col" className="sticky left-0 bg-[var(--soft)] px-5 py-3.5">Marca</th>
-                <th scope="col" className="px-3 py-3.5 text-right">Sin stock</th>
-                <th scope="col" className="px-3 py-3.5 text-right">Urgente</th>
-                <th scope="col" className="px-3 py-3.5 text-right">Comprar</th>
-                <th scope="col" className="px-3 py-3.5 text-right">Compra sugerida</th>
-                <th scope="col" className="px-3 py-3.5 text-right">Consumo trim. prom.</th>
-                <th scope="col" className="px-3 py-3.5 text-right">Cobertura actual</th>
-                <th scope="col" className="px-5 py-3.5 text-right">Objetivo</th>
+                <th scope="col" className="sticky left-0 bg-[var(--soft)] px-5 py-2.5">Marca</th>
+                <th scope="col" className="px-3 py-2.5 text-right">Sin stock</th>
+                <th scope="col" className="px-3 py-2.5 text-right">Urgente</th>
+                <th scope="col" className="px-3 py-2.5 text-right">Comprar</th>
+                <th scope="col" className="px-3 py-2.5 text-right">Compra sugerida</th>
+                <th scope="col" className="px-3 py-2.5 text-right">Consumo trim. prom.</th>
+                <th scope="col" className="px-3 py-2.5 text-right">Cobertura actual</th>
+                <th scope="col" className="px-5 py-2.5 text-right">Objetivo</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--line)]">
               {visible.map((brand) => (
                 <tr key={brand.marca} className="transition hover:bg-[#f8fafb]">
-                  <th scope="row" className="sticky left-0 bg-white px-5 py-3.5 font-semibold text-[var(--navy)]">{brand.marca}</th>
-                  <td className="px-3 py-3.5 text-right font-semibold tabular-nums text-red-700">{number(brand.sinStock)}</td>
-                  <td className="px-3 py-3.5 text-right tabular-nums">{number(brand.urgente)}</td>
-                  <td className="px-3 py-3.5 text-right tabular-nums">{number(brand.comprar)}</td>
-                  <td className="px-3 py-3.5 text-right font-semibold tabular-nums text-[var(--navy)]">{number(brand.compra)}</td>
-                  <td className="px-3 py-3.5 text-right tabular-nums">{number(brand.consumoTrimestralPromedio)}</td>
-                  <td className="px-3 py-3.5 text-right tabular-nums">{decimal(brand.coberturaPromedio, 2)} meses</td>
-                  <td className="px-5 py-3.5 text-right font-semibold tabular-nums text-[var(--navy)]">{decimal(brand.coberturaObjetivo, 1)}</td>
+                  <th scope="row" className="sticky left-0 bg-white px-5 py-2.5 font-semibold text-[var(--navy)]">{brand.marca}</th>
+                  <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-red-700">{number(brand.sinStock)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{number(brand.urgente)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{number(brand.comprar)}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-[var(--navy)]">{number(brand.compra)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{number(brand.consumoTrimestralPromedio)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{decimal(brand.coberturaPromedio, 2)} meses</td>
+                  <td className="px-5 py-2.5 text-right font-semibold tabular-nums text-[var(--navy)]">{decimal(brand.coberturaObjetivo, 1)}</td>
                 </tr>
               ))}
             </tbody>
@@ -163,15 +184,8 @@ function BrandsTable({ title, subtitle, brands }: { title: string; subtitle: str
 function DashboardContent({ dashboard }: { dashboard: ComprasDashboard }) {
   return (
     <>
-      <section className="mt-5 rounded-[24px] border border-[var(--line)] bg-white p-5 sm:p-6" aria-labelledby="compras-fuentes-title">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Calidad de datos</p>
-            <h2 id="compras-fuentes-title" className="mt-1 text-base font-semibold text-[var(--navy)]">Última importación por fuente</h2>
-          </div>
-          <Clock3 aria-hidden="true" className="size-5 text-[var(--muted)]" strokeWidth={1.7} />
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mt-4 rounded-[22px] border border-[var(--line)] bg-white p-2.5 sm:p-3" aria-label="Estado de fuentes de datos">
+        <div className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-4">
           <SourceStatus label="Stock Warnes" source={dashboard.fuentes.stockWarnes} action={<ComprasWarnesSyncButton />} />
           <SourceStatus label="Stock Escobar" source={dashboard.fuentes.stockEscobar} />
           <SourceStatus label="Ventas" source={dashboard.fuentes.ventas} action={<ComprasVentasSyncButton />} />
@@ -179,26 +193,22 @@ function DashboardContent({ dashboard }: { dashboard: ComprasDashboard }) {
         </div>
       </section>
 
-      <section className="mt-7" aria-labelledby="compras-resumen-title">
-        <div className="mb-4">
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Resumen operativo</p>
-          <h2 id="compras-resumen-title" className="mt-1 text-xl font-semibold tracking-[-0.025em] text-[var(--navy)]">Indicadores de compras</h2>
-        </div>
+      <section className="mt-4" aria-label="Indicadores de compras">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Kpi label="Sin stock" value={number(dashboard.sinStock)} tone="red" icon={AlertCircle} />
           <Kpi label="Urgentes" value={number(dashboard.urgente)} tone="orange" icon={AlertCircle} />
           <Kpi label="Comprar" value={number(dashboard.comprar)} tone="amber" icon={ShoppingCart} />
           <Kpi label="Revisar" value={number(dashboard.revisar)} tone="green" icon={TrendingUp} />
-          <Kpi label="Stock" value={number(dashboard.stock)} detail="Unidades físicas totales" icon={Boxes} />
-          <Kpi label="Pendiente" value={number(dashboard.pendiente)} detail="Unidades por recibir" icon={PackageCheck} />
-          <Kpi label="Cobertura" value={decimal(dashboard.coberturaPromedio, 2)} detail="Meses · marcas habilitadas" icon={TrendingUp} />
-          <Kpi label="Compra sugerida" value={number(dashboard.compraSugerida)} detail="Unidades · marcas habilitadas" icon={ArrowDownRight} />
+          <Kpi label="Stock" value={number(dashboard.stock)} icon={Boxes} />
+          <Kpi label="Pendiente" value={number(dashboard.pendiente)} icon={PackageCheck} />
+          <Kpi label="Cobertura" value={decimal(dashboard.coberturaPromedio, 2)} icon={TrendingUp} />
+          <Kpi label="Compra sugerida" value={number(dashboard.compraSugerida)} icon={ArrowDownRight} />
         </div>
       </section>
 
       <div className="mt-7 space-y-5">
-        <BrandsTable title="Marcas importadas" subtitle="Objetivo de referencia: 6 meses" brands={dashboard.marcasImportadas} />
-        <BrandsTable title="Marcas nacionales" subtitle="Objetivo de referencia: 1,5 meses" brands={dashboard.marcasNacionales} />
+        <BrandsTable title="Marcas importadas" subtitle="Objetivo: 6 meses" brands={dashboard.marcasImportadas} />
+        <BrandsTable title="Marcas nacionales" subtitle="Objetivo: 1,5 meses" brands={dashboard.marcasNacionales} />
       </div>
       <div className="mt-5 rounded-[20px] border border-[var(--line)] bg-[var(--soft)] px-5 py-4 text-sm text-[var(--muted)]">
         Marcas excluidas de nuevas compras: <strong className="text-[var(--navy)]">{number(dashboard.marcasNoCompra.length)}</strong>
@@ -267,16 +277,17 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   return (
     <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
       <main className={`mx-auto ${isWide ? "max-w-[1920px] px-4 py-5 lg:px-5 lg:py-6" : "max-w-[1440px] px-5 py-8 lg:px-10 lg:py-10"}`}>
-        <div className="flex flex-wrap items-center justify-center gap-3">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <nav
             aria-label="Vistas de Compras"
-            className="mx-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-2xl border border-[var(--line)] bg-white p-1.5 shadow-sm"
+            className="flex min-w-0 flex-1 items-center rounded-2xl border border-[var(--line)] bg-white p-1.5 shadow-sm"
           >
+            <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <Link
               href="/areas/compras"
               prefetch={false}
               aria-current={!isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${!isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${!isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               Dashboard
             </Link>
@@ -285,7 +296,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               href="/areas/compras?vista=gestion"
               prefetch={false}
               aria-current={isGestion ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isGestion ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isGestion ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               Gestión
             </Link>
@@ -294,7 +305,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               href="/areas/compras?vista=cotizaciones"
               prefetch={false}
               aria-current={isCotizaciones ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isCotizaciones ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isCotizaciones ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               Cotizaciones
             </Link>
@@ -303,7 +314,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               href="/areas/compras?vista=bandeja"
               prefetch={false}
               aria-current={isBandeja ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isBandeja ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isBandeja ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               Bandeja
             </Link>
@@ -312,7 +323,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               href="/areas/compras?vista=envios"
               prefetch={false}
               aria-current={isEnvios ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isEnvios ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isEnvios ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               Enviados
             </Link>
@@ -321,7 +332,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               href="/areas/compras?vista=proceso"
               prefetch={false}
               aria-current={isProceso ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isProceso ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isProceso ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               En proceso
             </Link>
@@ -330,7 +341,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               href="/areas/compras?vista=packing"
               prefetch={false}
               aria-current={isPacking ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isPacking ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isPacking ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               Packing List
             </Link>
@@ -339,7 +350,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               href="/areas/compras?vista=contenedores"
               prefetch={false}
               aria-current={isContenedores ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isContenedores ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isContenedores ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               Contenedores
             </Link>
@@ -348,14 +359,16 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               href="/areas/compras?vista=seguimiento"
               prefetch={false}
               aria-current={isSeguimiento ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition ${isSeguimiento ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isSeguimiento ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               Seguimiento
             </Link>
 
-            <details className="group relative">
+            </div>
+
+            <details className="group relative shrink-0">
               <summary
-                className={`flex cursor-pointer list-none items-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${
+                className={`flex cursor-pointer list-none items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${
                   isMoreView
                     ? "bg-[var(--navy)] text-white"
                     : "text-[var(--muted)] hover:bg-[var(--soft)]"
@@ -392,7 +405,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               </div>
             </details>
           </nav>
-          {!isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias && <ComprasDashboardActions canExport={Boolean(dashboard) && !isGestion} />}
+          {!isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias && <div className="shrink-0 xl:ml-2"><ComprasDashboardActions canExport={Boolean(dashboard) && !isGestion} /></div>}
         </div>
 
         {error && !isHistorial ? (

@@ -48,14 +48,14 @@ El Dashboard en `/areas/compras` conserva la lógica de `obtenerDashboardPortalC
 La fuente es actualmente **híbrida**:
 
 1. `src/lib/compras-sheets.ts` lee en paralelo Google Sheets y los snapshots vigentes de Warnes, Escobar, Ventas y Órdenes en Supabase.
-2. Desde Sheets obtiene `MODELO_COMPRAS`, configuración y alias de marcas, `MAPA_SKU`, `CONTROL_IMPORTACIONES_STOCK` y `LOG_IMPORTACIONES`.
+2. Desde Sheets obtiene `MODELO_COMPRAS`, configuración y alias de marcas, `MAPA_SKU` y `CONTROL_IMPORTACIONES_STOCK`. La frescura de Órdenes ya no depende de `LOG_IMPORTACIONES`.
 3. `src/lib/compras-stock-supabase.ts` pagina la vista `compras_stock_actual_por_sku` de Supabase y obtiene `stock_warnes`, fecha e ID de importación.
 4. Antes de calcular el Dashboard, `applyWarnesStockToDashboardModel()` reemplaza en memoria `STOCK_WARNES` y, cuando existe un snapshot Escobar validado, también `STOCK_ESCOBAR` por SKU. Un SKU ausente del snapshot completo de su depósito se considera `0`. Luego recalcula `STOCK_TOTAL` con ambos depósitos de Supabase; sin snapshot Escobar conserva el valor legacy.
-5. Las fechas de importación de Warnes, Escobar y Órdenes se reemplazan en memoria para que las tarjetas de frescura reflejen los snapshots reales de Supabase.
+5. Las fechas de importación de Warnes, Escobar y Órdenes se reemplazan en memoria para que las tarjetas de frescura reflejen los snapshots reales de Supabase. De Órdenes se consume sólo esa fecha; todavía no se inyectan cantidades por SKU.
 6. `src/lib/compras-ventas-model.ts` aplica `MAPA_SKU` como el legacy y reemplaza en memoria sólo `CONSUMO_12_MESES` (agosto 2025 a julio 2026) y `PROMEDIO_MENSUAL` (suma / 12) desde Supabase.
 7. `calculateComprasDashboard()` calcula agrupaciones y KPIs sin modificar ninguna fuente.
 
-**Límite importante del estado actual:** `RIESGO`, `PENDIENTE_TOTAL` y `COMPRA_SUGERIDA` todavía provienen de las columnas ya calculadas de `MODELO_COMPRAS` en Sheets. No se recalculan automáticamente aunque hayan cambiado Warnes, Escobar o la demanda. Ese recálculo integral queda para un hito posterior, cuando estén migradas las demás fuentes necesarias.
+**Límite importante del estado actual:** `PENDIENTE_TOTAL`, `EMBARCADO`, `EN_FABRICA`, `RIESGO` y `COMPRA_SUGERIDA` todavía provienen de las columnas ya calculadas de `MODELO_COMPRAS` en Sheets. No se recalculan automáticamente aunque hayan cambiado Warnes, Escobar, Ventas u Órdenes. La ingesta de Órdenes sólo actualiza su tarjeta de frescura; los indicadores de pendiente y compra aún no usan sus líneas.
 
 ## Sincronización automática de Stock Warnes — completada
 
@@ -123,8 +123,9 @@ antes del mapeo y 11.877 después de canonizar. Frente a la hoja `VENTAS`, sólo
 desactualizado; 27.177 ya coincidían. No se listaron datos por SKU ni secretos.
 
 El próximo hito no debe recalcular todavía riesgo o compra sugerida de forma
-aislada. Tras la incorporación temporal de Stock Escobar, queda migrar Órdenes
-y luego diseñar el recálculo integral y auditable.
+aislada. Con la ingesta de Órdenes incorporada, sigue pendiente conciliar
+`ITEM` con SKU BAM y reproducir el pendiente real desde el detalle legacy;
+después podrá diseñarse el recálculo integral y auditable.
 
 ## Stock Escobar — integración temporal Octosis/Drive
 
@@ -164,12 +165,28 @@ La primera ejecución programada de las 11:30 quedó `COMPLETADO` y reutilizó
 el snapshot #1 sin duplicarlo; la próxima revisión quedó para el 17/09 a las
 11:30. Cada intento automático genera una solicitud auditable.
 
+**Estado de conexión con el Dashboard:** la ingesta, el botón manual, la
+programación diaria, la migración SQL y la lectura de la fecha del último
+snapshot validado están implementados. El commit `b13da87` está en `main`
+remoto. Falta verificar visualmente en el portal desplegado que el botón
+manual y la fecha de frescura se muestren y funcionen; el push por sí solo no
+demuestra que haya terminado el despliegue.
+
 La vista de Seguimiento y Recepciones sigue leyendo la hoja `ORDENES` del
 legacy; `PENDIENTE_TOTAL`, `EMBARCADO`, `EN_FABRICA`, `RIESGO` y
 `COMPRA_SUGERIDA` siguen siendo columnas persistidas de `MODELO_COMPRAS`.
 El detalle canónico de pendiente en el legacy proviene de
 `DETALLE_IMPORTACIONES.STATUS_LINEA` y `CANTIDAD_PENDIENTE`, con equivalencias
 de `ITEM` a SKU. No derivar esas cifras sólo del Excel de órdenes.
+
+Para que las cantidades de Órdenes alimenten el Dashboard, el siguiente hito
+debe (1) confirmar el cruce `ITEM` ↔ SKU BAM con las equivalencias legacy;
+(2) reproducir y conciliar por SKU el pendiente real de
+`DETALLE_IMPORTACIONES.STATUS_LINEA` y `CANTIDAD_PENDIENTE`, distinguiéndolo
+de la `CANTIDAD` original de la orden y excluyendo lo ya ingresado; y (3)
+reemplazar en memoria `PENDIENTE_TOTAL`, `EMBARCADO` y `EN_FABRICA` sólo tras
+comparar resultados contra el modelo legacy. El recálculo de `RIESGO` y
+`COMPRA_SUGERIDA` es un hito integral posterior.
 
 ## Archivos principales
 
@@ -186,6 +203,7 @@ de `ITEM` a SKU. No derivar esas cifras sólo del Excel de órdenes.
 - `src/lib/compras-historial.ts`: mapeo puro de situación actual y eventos históricos.
 - `src/components/compras-dashboard-actions.tsx`: actualizar y exportación del Dashboard.
 - `src/components/compras-warnes-sync-button.tsx`: inicio y seguimiento visual de la actualización Warnes.
+- `src/components/compras-ordenes-sync-button.tsx` y `src/app/api/compras/sync-ordenes/route.ts`: actualización manual autenticada de Órdenes.
 - `src/lib/compras-sheets.ts`: acceso a Sheets en servidor, con scope `spreadsheets.readonly`.
 - `src/lib/compras-dashboard.ts`: cálculos puros del Dashboard y utilidades compartidas.
 - `src/lib/compras-stock-supabase.ts`: lectura del snapshot Warnes e inyección en memoria sobre el modelo legacy.
@@ -194,10 +212,12 @@ de `ITEM` a SKU. No derivar esas cifras sólo del Excel de órdenes.
 - `src/lib/compras-sync.ts`: solicitudes de sincronización y dispatch del workflow de Warnes.
 - `bridge/ventas-sync.mjs`: extracción SQL, validación, idempotencia y publicación automática/manual de Ventas.
 - `bridge/escobar-sync.mjs` y `bridge/escobar-parse.mjs`: detección diaria en Drive, parser XLSX y publicación de Escobar.
+- `bridge/ordenes-sync.mjs` y `bridge/ordenes-parse.mjs`: lectura diaria/manual del XLSX de Órdenes, validación y publicación.
+- `src/lib/compras-ordenes-supabase.ts`: lectura de la frescura del snapshot de Órdenes para el Dashboard.
 - `src/app/api/compras/sync-warnes/route.ts`: endpoint autenticado para iniciar y consultar la sincronización.
 - `workers/wms-stock/wms_stock_sync.py`: automatización productiva WMS → Supabase.
 - `.github/workflows/sync-warnes-stock.yml`: ejecución manual/programada del worker.
-- `supabase/migrations/003_stock_compras.sql` a `006_compras_ventas_demanda_legacy.sql`: persistencia, vistas, seguridad y seguimiento independiente de Warnes y Ventas.
+- `supabase/migrations/003_stock_compras.sql` a `007_compras_ordenes.sql`: persistencia, vistas, seguridad y seguimiento independiente de Warnes, Ventas y Órdenes.
 - `src/lib/compras-gestion.ts`: mapeo, filtros y resumen puros de Gestión.
 - `src/app/api/compras/dashboard-export/route.ts`: XLSX del Dashboard, sin escrituras en Google.
 - `tests/compras-dashboard.test.mjs`, `tests/compras-gestion.test.mjs`, `tests/compras-historial.test.mjs`, `tests/compras-envios.test.mjs`, `tests/compras-cotizaciones.test.mjs` y `tests/compras-bandeja.test.mjs`: pruebas de lógica.
@@ -216,6 +236,13 @@ Bandeja de Compra quedó incorporada en la navegación antes de Enviados a Compr
 
 La conexión automática completa de Warnes fue confirmada funcionalmente por el usuario el 15/09/2026. Ventas Hito 2 pasó 7 pruebas focalizadas, TypeScript, ESLint focalizado y `git diff --check`; no se ejecutó una compilación completa. Escobar pasó una extracción de sólo lectura real desde Drive, validó y publicó el snapshot #5; el worker local quedó ejecutándose. No se hizo una compilación completa.
 
+Órdenes pasó parsing del XLSX real, comprobación de tipos, ESLint focalizado,
+chequeos sintácticos y `git diff --check`, sin compilación completa. La
+migración `007` se aplicó en Supabase; se verificaron las 3.477 líneas del
+snapshot #1 y una solicitud programada `COMPLETADO` que reutilizó ese snapshot.
+El worker local siguió saludable y los demás bridges respondieron `ok`.
+No se verificó aún la presentación ni el botón en el portal desplegado.
+
 Pendiente de aprobación y definición funcional: conectar **Guardar** de Gestión, **Enviar a Compra** de Bandeja, **Generar OC** de Enviados y los flujos de escritura de Cotizaciones, Compras en Proceso, Packing List, Contenedores y Recepciones. Esas vistas ya existen en modo consulta; sus botones de escritura continúan deshabilitados. No habilitar operaciones remotas de escritura sin implementación real y validación específica.
 
 Este proyecto usa Next.js 16.3.4. Antes de modificar código Next, consultar la guía pertinente en `node_modules/next/dist/docs/`, según `AGENTS.md`.
@@ -224,22 +251,24 @@ Este proyecto usa Next.js 16.3.4. Antes de modificar código Next, consultar la 
 
 Para retomar, leer primero este archivo completo y `AGENTS.md`, verificar rama y `git status`, y leer las guías relevantes de `node_modules/next/dist/docs/` antes de tocar código Next.js. El estado base esperado incluye las migraciones `003` y `004`, el workflow `sync-warnes-stock.yml`, el worker `workers/wms-stock/` y el botón de Warnes en el Dashboard.
 
-Ventas Hitos 1 y 2 y la ingesta temporal de Escobar están implementados. Proteger sus workers locales y la sincronización Warnes ya validada. El siguiente candidato es Órdenes; recién con las fuentes necesarias migradas debe planificarse el reemplazo integral de riesgo y compra sugerida heredados de `MODELO_COMPRAS`.
+Ventas Hitos 1 y 2, la ingesta temporal de Escobar y la ingesta/frescura de Órdenes están implementados. Proteger sus workers locales y la sincronización Warnes ya validada. El siguiente candidato es conciliar el pendiente por SKU del detalle legacy antes de reemplazar las columnas de pendiente del Dashboard. Después debe planificarse el recálculo integral de riesgo y compra sugerida heredados de `MODELO_COMPRAS`.
 
 ### Prompt sugerido para una conversación nueva
 
 ```text
 Continuemos la migración del sistema de Compras en el proyecto Grupo Aftermarket. Trabajá en el estado actual del repositorio y leé primero AGENTS.md y docs/COMPRAS_MIGRACION_ESTADO.md completos.
 
-La conexión automática de Stock Warnes ya funciona de punta a punta y fue validada al 100 %. No la reemplaces ni la rompas. Su flujo actual es Portal → solicitud en Supabase → GitHub Actions → worker Playwright/WMS → XLS validado → snapshot en Supabase → Dashboard. Google Sheets sigue siendo sólo lectura y las credenciales nunca deben llegar al navegador.
+Warnes funciona de punta a punta y fue validado al 100 %. Ventas Hitos 1 y 2,
+Stock Escobar y la ingesta/frescura de Órdenes están implementados. No rompas
+esas conexiones. Google Sheets sigue siendo sólo lectura y las credenciales
+nunca deben llegar al navegador.
 
-El próximo objetivo es automatizar la fuente VENTAS. Antes de programar, analizá:
-- la dependencia actual del Dashboard respecto de VENTAS y MODELO_COMPRAS;
-- docs/sistema-importaciones-legacy/importador_ventas.gs, importador_ventas_ui.html, ventas_modelo.gs y 30_admin_ventas.gs;
-- el patrón implementado para Warnes en workers/wms-stock/, .github/workflows/sync-warnes-stock.yml, supabase/migrations/003_stock_compras.sql y 004_compras_sync_requests.sql, src/lib/compras-stock-supabase.ts, src/lib/compras-sync.ts y src/app/api/compras/sync-warnes/route.ts;
-- la conexión SQL existente en bridge/server.mjs y docs/EXECUTIVE_SQL_BRIDGE.md. La consulta ejecutiva actual a VS_REPORTING.dbo.Vista_Ventas_origen_v2 sólo devuelve conteos agregados y no reemplaza la serie de unidades/facturación por SKU.
-
-Necesito que determines cuál debe ser la fuente autoritativa y me pidas únicamente los datos que falten para confirmarla: SQL/Vista_Ventas_origen_v2, otro endpoint o el XLSX legacy. Verificá el mapeo articulo ↔ Cod_BAM/Código, Base_Origen ↔ DTM/IMP/JNM/NLI/NLD, período histórico, unidades netas, facturación neta sin IVA, frecuencia y accesibilidad desde el ejecutor.
-
-Proponé primero un plan concreto para Ventas con esquema de snapshots auditables en Supabase, idempotencia, validaciones, actualización automática/manual, seguridad y estrategia de lectura desde el Dashboard. Diferenciá claramente dos hitos: (1) ingesta + frescura de Ventas; (2) sustitución en memoria de PROMEDIO_MENSUAL/CONSUMO_12_MESES y, más adelante, recálculo completo de riesgo/compra sugerida. No escribas Google Sheets, no expongas secretos y no mezcles Ventas con las tablas de stock. No programes hasta que yo confirme la fuente y apruebe el plan. Evitá compilaciones y pruebas innecesarias; hacé sólo verificaciones focalizadas cuando corresponda.
+Antes de cambiar los KPIs por las órdenes nuevas, verificá en el portal
+desplegado el botón manual y la fecha de frescura. Luego analizá el cruce
+`ITEM` ↔ SKU BAM y la lógica legacy de `DETALLE_IMPORTACIONES.STATUS_LINEA` y
+`CANTIDAD_PENDIENTE`. Contrastá por SKU contra `MODELO_COMPRAS` antes de
+sustituir en memoria `PENDIENTE_TOTAL`, `EMBARCADO` y `EN_FABRICA`. No infieras
+pendiente desde la cantidad original de la orden. Dejá `RIESGO` y
+`COMPRA_SUGERIDA` para el recálculo integral posterior. No escribas en Google
+Sheets, no expongas secretos y evitá compilaciones o pruebas innecesarias.
 ```

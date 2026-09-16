@@ -39,12 +39,10 @@ export function ComprasOrdenesSyncButton() {
   }
 
   return <div className="flex items-center gap-2">
-    {message ? <span className="hidden max-w-24 truncate text-[10px] font-semibold xl:inline" title={message}>{message}</span> : null}
     <button type="button" onClick={update} disabled={busy} title="Actualizar órdenes desde el Excel de Drive"
       aria-label="Actualizar órdenes desde el Excel de Drive"
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-sky-300/80 bg-white/80 px-2.5 text-[10px] font-bold uppercase tracking-[0.05em] text-sky-800 transition hover:bg-white disabled:cursor-wait disabled:opacity-60">
+      className="grid size-8 place-items-center rounded-lg border border-emerald-700/80 bg-white/65 text-emerald-700 transition hover:bg-white hover:text-emerald-800 disabled:cursor-wait disabled:opacity-60">
       <RefreshCw aria-hidden="true" className={`size-3.5 ${busy ? "animate-spin" : ""}`} />
-      {busy ? "Actualizando" : "Actualizar"}
     </button>
   </div>;
 }

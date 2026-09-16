@@ -9,7 +9,7 @@ export function ComprasDashboardActions({ canExport }: { canExport: boolean }) {
   const [refreshing, startRefresh] = useTransition();
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <button
         type="button"
         onClick={() => startRefresh(() => router.refresh())}

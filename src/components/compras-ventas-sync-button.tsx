@@ -115,16 +115,6 @@ export function ComprasVentasSyncButton() {
 
   return (
     <div className="flex items-center gap-2">
-      {message ? (
-        <span
-          className={`hidden max-w-24 truncate text-[10px] font-semibold xl:inline ${
-            isError ? "text-red-700" : isDone ? "text-emerald-700" : "text-sky-800/70"
-          }`}
-          title={message}
-        >
-          {message}
-        </span>
-      ) : null}
 
       <button
         type="button"
@@ -132,7 +122,7 @@ export function ComprasVentasSyncButton() {
         disabled={pending}
         title="Actualizar Ventas desde SQL Server"
         aria-label="Actualizar Ventas desde SQL Server"
-        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-sky-300/80 bg-white/80 px-2.5 text-[10px] font-bold uppercase tracking-[0.05em] text-sky-800 transition hover:bg-white disabled:cursor-wait disabled:opacity-60"
+        className="grid size-8 place-items-center rounded-lg border border-emerald-700/80 bg-white/65 text-emerald-700 transition hover:bg-white hover:text-emerald-800 disabled:cursor-wait disabled:opacity-60"
       >
         {pending ? (
           <Loader2 aria-hidden="true" className="size-3.5 animate-spin" />
@@ -143,7 +133,6 @@ export function ComprasVentasSyncButton() {
         ) : (
           <RefreshCw aria-hidden="true" className="size-3.5" />
         )}
-        {pending ? "Actualizando" : isDone ? "Listo" : isError ? "Reintentar" : "Actualizar"}
       </button>
     </div>
   );
