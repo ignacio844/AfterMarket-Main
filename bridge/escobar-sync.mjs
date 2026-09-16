@@ -30,10 +30,10 @@ function localParts(date = new Date()) {
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
 }
 
-export function millisecondsUntilNextCheck(date = new Date()) {
+export function millisecondsUntilNextCheck(date = new Date(), hourToCheck = 9, minuteToCheck = 0) {
   const { hour, minute, second } = localParts(date);
   const elapsed = (Number(hour) * 3600 + Number(minute) * 60 + Number(second)) * 1000 + date.getMilliseconds();
-  const target = 9 * 3600 * 1000;
+  const target = (hourToCheck * 3600 + minuteToCheck * 60) * 1000;
   return elapsed <= target ? target - elapsed : 24 * 3600 * 1000 - elapsed + target;
 }
 

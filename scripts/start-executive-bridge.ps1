@@ -76,6 +76,14 @@ function Start-EscobarBridge {
   Write-SupervisorLog 'Worker de Escobar iniciado en 8791.'
 }
 
+function Start-OrdenesBridge {
+  if (-not (Test-Path -LiteralPath $portalEnvironment)) {
+    throw "No se encontró $portalEnvironment"
+  }
+  Start-NodeProcess -WorkingDirectory $projectRoot -Arguments @('--env-file=.env.local', 'bridge/ordenes-sync.mjs') -LogPrefix 'ordenes-bridge'
+  Write-SupervisorLog 'Worker de Órdenes iniciado en 8792.'
+}
+
 function Test-VentasConfigured {
   if (-not (Test-Path -LiteralPath $portalEnvironment)) { return $false }
   $content = Get-Content -LiteralPath $portalEnvironment
@@ -147,6 +155,7 @@ while ($true) {
   }
   if (Test-EscobarConfigured) {
     Ensure-Service -HealthUri 'http://127.0.0.1:8791/health' -StartAction ${function:Start-EscobarBridge} -ServiceName 'worker de Escobar'
+    Ensure-Service -HealthUri 'http://127.0.0.1:8792/health' -StartAction ${function:Start-OrdenesBridge} -ServiceName 'worker de Órdenes'
   }
   Ensure-Service -HealthUri 'http://127.0.0.1:8790/health' -StartAction ${function:Start-Gateway} -ServiceName 'gateway compartido'
 

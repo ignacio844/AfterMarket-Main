@@ -1,6 +1,6 @@
 # Migración de Compras: contexto y estado
 
-Última actualización: 15/09/2026.
+Última actualización: 16/09/2026.
 
 ## Objetivo y decisiones vigentes
 
@@ -8,7 +8,7 @@ Se está migrando el sistema de Compras de Google Apps Script + Google Sheets (f
 
 Google Sheets continúa como fuente temporal **solo de lectura** para los datos todavía no migrados. Toda llamada a Google y el uso de credenciales ocurren del lado servidor. Se usa exclusivamente la autenticación del portal actual (NextAuth con Google y `isPortalUserAllowed`). No se escribe en Sheets ni se ejecuta o porta allí ningún proceso que recalcule `MODELO_COMPRAS`.
 
-La migración de fuentes automatizadas ya comenzó. **Stock Warnes está migrado a Supabase y su sincronización automática fue validada por el usuario como efectiva al 100 %.** Ventas dispone de ingesta SQL automática/manual y Escobar de ingesta diaria temporal desde un XLSX de Drive. Ninguno de los flujos escribe Google Sheets.
+La migración de fuentes automatizadas ya comenzó. **Stock Warnes está migrado a Supabase y su sincronización automática fue validada por el usuario como efectiva al 100 %.** Ventas dispone de ingesta SQL automática/manual; Escobar y Órdenes, de ingestas diarias temporales desde Drive. Ninguno de los flujos escribe Google Sheets.
 
 No modificar otras secciones del portal salvo lo estrictamente necesario para Compras. La UI debe seguir la estética de Grupo Aftermarket, sin copiar visualmente el sistema legacy.
 
@@ -39,7 +39,7 @@ Los botones **Gestionar** e **Historial** son visibles en cada fila. **Gestionar
 
 El Dashboard en `/areas/compras` conserva la lógica de `obtenerDashboardPortalCompras()` y presenta:
 
-- estado de actualización de Stock Warnes, Stock Escobar, Ventas y Órdenes;
+- estado de actualización de Stock Warnes, Stock Escobar, Ventas y Órdenes, con actualización manual de Warnes, Ventas y Órdenes;
 - KPIs de SKU sin stock, urgentes, comprar, revisar, stock físico, pendiente de recibir, cobertura ponderada y compra sugerida;
 - tablas de marcas importadas y nacionales, con riesgo, compra sugerida, consumo trimestral promedio, cobertura actual y objetivo;
 - cantidad de marcas excluidas de nuevas compras;
@@ -47,11 +47,11 @@ El Dashboard en `/areas/compras` conserva la lógica de `obtenerDashboardPortalC
 
 La fuente es actualmente **híbrida**:
 
-1. `src/lib/compras-sheets.ts` lee en paralelo Google Sheets y los snapshots vigentes de Warnes, Escobar y Ventas en Supabase.
+1. `src/lib/compras-sheets.ts` lee en paralelo Google Sheets y los snapshots vigentes de Warnes, Escobar, Ventas y Órdenes en Supabase.
 2. Desde Sheets obtiene `MODELO_COMPRAS`, configuración y alias de marcas, `MAPA_SKU`, `CONTROL_IMPORTACIONES_STOCK` y `LOG_IMPORTACIONES`.
 3. `src/lib/compras-stock-supabase.ts` pagina la vista `compras_stock_actual_por_sku` de Supabase y obtiene `stock_warnes`, fecha e ID de importación.
 4. Antes de calcular el Dashboard, `applyWarnesStockToDashboardModel()` reemplaza en memoria `STOCK_WARNES` y, cuando existe un snapshot Escobar validado, también `STOCK_ESCOBAR` por SKU. Un SKU ausente del snapshot completo de su depósito se considera `0`. Luego recalcula `STOCK_TOTAL` con ambos depósitos de Supabase; sin snapshot Escobar conserva el valor legacy.
-5. Las fechas de importación de Warnes y Escobar se reemplazan en memoria para que las tarjetas de frescura reflejen los snapshots reales de Supabase.
+5. Las fechas de importación de Warnes, Escobar y Órdenes se reemplazan en memoria para que las tarjetas de frescura reflejen los snapshots reales de Supabase.
 6. `src/lib/compras-ventas-model.ts` aplica `MAPA_SKU` como el legacy y reemplaza en memoria sólo `CONSUMO_12_MESES` (agosto 2025 a julio 2026) y `PROMEDIO_MENSUAL` (suma / 12) desde Supabase.
 7. `calculateComprasDashboard()` calcula agrupaciones y KPIs sin modificar ninguna fuente.
 
@@ -83,7 +83,7 @@ Configuración privada usada por este flujo (registrar sólo nombres, nunca valo
 
 ## Datos y lógica de las vistas
 
-- Dashboard: lee `MODELO_COMPRAS`, `CONFIG_MARCAS_COMPRA`, `ALIAS_MARCAS_COMPRA`, `MAPA_SKU`, `CONTROL_IMPORTACIONES_STOCK` y `LOG_IMPORTACIONES`; Warnes y Ventas llegan desde Supabase.
+- Dashboard: lee `MODELO_COMPRAS`, `CONFIG_MARCAS_COMPRA`, `ALIAS_MARCAS_COMPRA`, `MAPA_SKU` y `CONTROL_IMPORTACIONES_STOCK`; Warnes, Ventas y la frescura de Órdenes llegan desde Supabase.
 - Gestión: lee `GESTION_COMPRAS_ACTIVA`, `CONFIG_MARCAS_COMPRA` y `ALIAS_MARCAS_COMPRA`. El origen y la política de compra se resuelven desde configuración y alias, como en el legacy; no se toman de columnas precalculadas de la hoja de Gestión.
 - Cotizaciones: lee `GESTION_COMPRAS_ACTIVA`, `COTIZACIONES_COMPRA`, `COTIZACIONES_OFERTAS`, y sólo si falta `ORIGEN` en la hoja activa usa la configuración/alias de marcas. La bandeja incluye sólo SKU `IMPORTADO` con estado `COTIZAR` y `CANTIDAD_DECIDIDA > 0`, excluyendo los que figuran en una CT `ABIERTA`. Ordena por marca/SKU y calcula SKU, unidades y marcas. Los lotes CT agrupan sus ítems por `NRO_COTIZACION`; las ofertas se agrupan por proveedor (sin distinguir mayúsculas), con precio, cantidad, subtotal y total. El ranking compara precios unitarios positivos por SKU dentro de una misma moneda: empates en el mínimo son **MEJOR PRECIO** y el siguiente valor distinto es **2° PRECIO**. Para CT cerradas se muestra inicialmente la oferta seleccionada y se pueden expandir las demás.
 - Bandeja de Compra: lee `GESTION_COMPRAS_ACTIVA`, `COTIZACIONES_COMPRA` y `COTIZACIONES_OFERTAS`. Incluye cualquier SKU con estado `APROBADO` y `CANTIDAD_DECIDIDA > 0`, sin filtrar por origen. Cuenta SKU, suma unidades, cuenta marcas y ordena por marca/SKU. El cruce con CT `APROBADA` y su oferta del proveedor seleccionado completa número de cotización, proveedor y código de proveedor cuando existen. La selección es local; **Enviar a Compra** está deshabilitado porque `enviarACompraPortal()` escribe en Sheets. La descarga CSV usa sólo los datos ya leídos en el navegador.
@@ -98,7 +98,7 @@ Configuración privada usada por este flujo (registrar sólo nombres, nunca valo
 - Las fechas seriales del Historial se interpretan con la zona horaria declarada por la planilla y se presentan en `America/Argentina/Buenos_Aires`, como el Apps Script. La planilla consultada declara `America/Los_Angeles`; por eso una celda visible como `07:15` allí aparece como `11:15` en el historial durante agosto. La conversión considera horario de verano.
 - Gestión conserva los seis estados legacy: `PENDIENTE`, `COTIZAR`, `APROBADO`, `NO COMPRAR`, `POSTERGAR` y `ENVIADO A COMPRA`.
 - El resumen de Gestión cuenta registros visibles, pendientes, estados distintos de pendiente y suma `COMPRA_SUGERIDA` de los registros filtrados.
-- Los métodos operativos de escritura legacy, como `guardarDecisionCompraPortal`, `guardarGestionMasivaPortal`, generación de OC, recepción e importación logística, no se han portado. Las únicas escrituras nuevas habilitadas en Compras son las ingestas técnicas de Warnes y Ventas y el seguimiento de sus solicitudes en Supabase.
+- Los métodos operativos de escritura legacy, como `guardarDecisionCompraPortal`, `guardarGestionMasivaPortal`, generación de OC, recepción e importación logística, no se han portado. Las únicas escrituras nuevas habilitadas en Compras son las ingestas técnicas de Warnes, Ventas y Órdenes y el seguimiento de sus solicitudes en Supabase.
 
 El último control read-only de Google Sheets confirmó encabezados compatibles y una lectura completa de las tres hojas de Gestión. En ese momento, `GESTION_COMPRAS_ACTIVA` tenía 3.697 SKU; el número puede cambiar.
 
@@ -141,6 +141,35 @@ health check local respondió correctamente en `127.0.0.1:8791/health`.
 La carpeta de septiembre está configurada; al crear la de octubre hay que
 concederle lectura a la cuenta de servicio y actualizar
 `ESCOBAR_DRIVE_FOLDER_ID`. Véase `docs/COMPRAS_ESCOBAR_SYNC.md`.
+
+## Órdenes de compra — fuente temporal Excel/Drive
+
+El archivo `STATUSIMPORTADO27101.xlsx` en Drive contiene varias pestañas. Para
+el snapshot de órdenes se usa exclusivamente `STATUS ORDENES IMPORTADAS`, que
+corresponde a la estructura legacy de `ORDENES`: número de orden, marca, ítem,
+cantidad, `STATUS`, `SITUACION`, packing list, prueba/código auxiliar, precio
+original y numérico, moneda, fecha y proveedor. La pestaña `STATUS REMANENTE`
+es distinta y no se suma a esta extracción. `ITEM` no se presume SKU BAM.
+
+`bridge/ordenes-sync.mjs` consulta este XLSX en modo sólo lectura una vez al
+día a las 11:30 de Argentina (el archivo observado el 16/09 se modificó a las
+11:05), y procesa solicitudes manuales de `/api/compras/sync-ordenes`. Los
+snapshots independientes de `supabase/migrations/007_compras_ordenes.sql`
+guardan cada línea, hash del contenido de la pestaña, conteos y errores de
+validación. El Dashboard muestra la fecha del último snapshot validado.
+La primera carga validada fue el snapshot #1 del 16/09/2026: 3.478 filas de
+origen, 3.477 válidas, una sin `STATUS`, 223 órdenes y 4.305.489 unidades.
+El worker local quedó activo en `127.0.0.1:8792/health`.
+La primera ejecución programada de las 11:30 quedó `COMPLETADO` y reutilizó
+el snapshot #1 sin duplicarlo; la próxima revisión quedó para el 17/09 a las
+11:30. Cada intento automático genera una solicitud auditable.
+
+La vista de Seguimiento y Recepciones sigue leyendo la hoja `ORDENES` del
+legacy; `PENDIENTE_TOTAL`, `EMBARCADO`, `EN_FABRICA`, `RIESGO` y
+`COMPRA_SUGERIDA` siguen siendo columnas persistidas de `MODELO_COMPRAS`.
+El detalle canónico de pendiente en el legacy proviene de
+`DETALLE_IMPORTACIONES.STATUS_LINEA` y `CANTIDAD_PENDIENTE`, con equivalencias
+de `ITEM` a SKU. No derivar esas cifras sólo del Excel de órdenes.
 
 ## Archivos principales
 

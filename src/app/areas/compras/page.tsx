@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { ComprasDashboardActions } from "@/components/compras-dashboard-actions";
 import { ComprasWarnesSyncButton } from "@/components/compras-warnes-sync-button";
 import { ComprasVentasSyncButton } from "@/components/compras-ventas-sync-button";
+import { ComprasOrdenesSyncButton } from "@/components/compras-ordenes-sync-button";
 import { ComprasGestionWorkspace } from "@/components/compras-gestion-workspace";
 import { ComprasHistorialWorkspace } from "@/components/compras-historial-workspace";
 import { ComprasEnviosWorkspace } from "@/components/compras-envios-workspace";
@@ -174,7 +175,7 @@ function DashboardContent({ dashboard }: { dashboard: ComprasDashboard }) {
           <SourceStatus label="Stock Warnes" source={dashboard.fuentes.stockWarnes} action={<ComprasWarnesSyncButton />} />
           <SourceStatus label="Stock Escobar" source={dashboard.fuentes.stockEscobar} />
           <SourceStatus label="Ventas" source={dashboard.fuentes.ventas} action={<ComprasVentasSyncButton />} />
-          <SourceStatus label="Órdenes de compra" source={dashboard.fuentes.ordenes} />
+          <SourceStatus label="Órdenes de compra" source={dashboard.fuentes.ordenes} action={<ComprasOrdenesSyncButton />} />
         </div>
       </section>
 
