@@ -15,18 +15,19 @@ La columna `Ranking` contiene fórmulas externas y no se lee ni ejecuta.
 
 ## Ejecución
 
-`bridge/escobar-sync.mjs` revisa la carpeta cada 15 minutos a partir de las
-09:00 de `America/Argentina/Buenos_Aires`. Sólo toma un XLSX cuyo nombre y
+`bridge/escobar-sync.mjs` revisa la carpeta una sola vez por día a las 09:00 de
+`America/Argentina/Buenos_Aires`; al iniciar fuera de ese horario espera la
+próxima revisión sin consultar Drive. Sólo toma un XLSX cuyo nombre y
 fecha de creación en Drive correspondan al día local. Si aún no existe, espera
-sin sustituir el snapshot anterior. Si el archivo cambia durante el día, el
-hash permite registrar una versión nueva. `scripts/start-executive-bridge.ps1`
+hasta el día siguiente sin sustituir el snapshot anterior. El hash evita
+duplicar un archivo ya importado. `scripts/start-executive-bridge.ps1`
 mantiene el worker activo junto con los otros bridges; el health check sólo
 está disponible en `127.0.0.1:8791/health`.
 
 Configuración en `.env.local`: `GOOGLE_SERVICE_ACCOUNT_EMAIL`,
 `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY` y,
-opcionalmente, `ESCOBAR_DRIVE_FOLDER_ID`, `ESCOBAR_BRIDGE_PORT`,
-`ESCOBAR_POLL_MS`. La cuenta de servicio necesita acceso de lector a la carpeta.
+opcionalmente, `ESCOBAR_DRIVE_FOLDER_ID` y `ESCOBAR_BRIDGE_PORT`. La cuenta de
+servicio necesita acceso de lector a la carpeta.
 Al cambiar de mes debe actualizarse `ESCOBAR_DRIVE_FOLDER_ID` y concederse
 lectura a la carpeta nueva, o el worker no encontrará el archivo diario.
 

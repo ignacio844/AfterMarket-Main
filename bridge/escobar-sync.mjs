@@ -6,7 +6,6 @@ import { createClient } from "@supabase/supabase-js";
 import { parseEscobarWorkbook } from "./escobar-parse.mjs";
 
 const FOLDER_ID = process.env.ESCOBAR_DRIVE_FOLDER_ID?.trim() || "1lEWgwWsxXBFfXHida9I2BWy0WodOv8ZF";
-const POLL_MS = Math.max(60_000, Number(process.env.ESCOBAR_POLL_MS ?? 15 * 60_000));
 const HOST = "127.0.0.1";
 const PORT = Number(process.env.ESCOBAR_BRIDGE_PORT ?? 8791);
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -24,9 +23,18 @@ function localParts(date = new Date()) {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
     hourCycle: "h23",
   }).formatToParts(date);
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+export function millisecondsUntilNextCheck(date = new Date()) {
+  const { hour, minute, second } = localParts(date);
+  const elapsed = (Number(hour) * 3600 + Number(minute) * 60 + Number(second)) * 1000 + date.getMilliseconds();
+  const target = 9 * 3600 * 1000;
+  return elapsed <= target ? target - elapsed : 24 * 3600 * 1000 - elapsed + target;
 }
 
 function localDate(date) {
@@ -176,7 +184,6 @@ let lastFileVersion = null;
 
 async function tick({ dryRun = false, localFile = null } = {}) {
   if (running) return;
-  if (!dryRun && Number(localParts().hour) < 9) return;
   running = true;
   try {
     let file;
@@ -234,18 +241,27 @@ async function main() {
     if (lastError) process.exitCode = 1;
     return;
   }
+  let nextCheckAt = null;
+  let timer = null;
   const server = createServer((request, response) => {
     if (request.method !== "GET" || request.url !== "/health") {
       response.writeHead(404);
       return response.end();
     }
     response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-    response.end(JSON.stringify({ status: lastError ? "degraded" : "ok", running, lastRunAt, lastError, lastFile }));
+    response.end(JSON.stringify({ status: lastError ? "degraded" : "ok", running, lastRunAt, lastError, lastFile, nextCheckAt }));
   });
   server.listen(PORT, HOST, () => console.log(`Escobar worker en http://${HOST}:${PORT}`));
-  await tick();
-  const timer = setInterval(() => void tick(), POLL_MS);
-  const shutdown = () => { clearInterval(timer); server.close(); };
+  const scheduleNext = () => {
+    const delay = millisecondsUntilNextCheck();
+    nextCheckAt = new Date(Date.now() + delay).toISOString();
+    timer = setTimeout(async () => {
+      nextCheckAt = null;
+      try { await tick(); } finally { scheduleNext(); }
+    }, delay);
+  };
+  scheduleNext();
+  const shutdown = () => { clearTimeout(timer); server.close(); };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 }

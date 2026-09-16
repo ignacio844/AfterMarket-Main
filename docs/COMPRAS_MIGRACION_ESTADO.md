@@ -128,7 +128,7 @@ y luego diseñar el recálculo integral y auditable.
 
 ## Stock Escobar — integración temporal Octosis/Drive
 
-El worker local `bridge/escobar-sync.mjs` lee diariamente, desde las 09:00 de
+El worker local `bridge/escobar-sync.mjs` lee una sola vez al día, a las 09:00 de
 Argentina, el XLSX de inventario en una carpeta de Drive compartida en modo
 lector con la cuenta de servicio. Filtra los depósitos que contienen `EXT`,
 `REV`, `INV` o `TEP`, suma `Saldo` por `Código` (SKU BAM), valida volumen y
