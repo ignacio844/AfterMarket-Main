@@ -21,7 +21,7 @@ import { ComprasTransferenciasWorkspace } from "@/components/compras-transferenc
 import { isPortalUserAllowed } from "@/lib/portal-auth";
 import { getComprasDashboard, getComprasGestion, getComprasHistorial, getComprasEnvios, getComprasCotizaciones, getComprasBandeja, getComprasProceso, getComprasPacking, getComprasContenedores, getComprasSeguimiento, getComprasRecepciones, getComprasTransferencias } from "@/lib/compras-sheets";
 import type { ComprasDashboard, DashboardBrand, DashboardSource } from "@/lib/compras-dashboard";
-import type { ComprasGestion } from "@/lib/compras-gestion";
+import { resolveGestionBrand, type ComprasGestion } from "@/lib/compras-gestion";
 import type { ComprasHistorial } from "@/lib/compras-historial";
 import type { ComprasEnvios } from "@/lib/compras-envios";
 import type { ComprasCotizaciones } from "@/lib/compras-cotizaciones";
@@ -162,7 +162,16 @@ function BrandsTable({ title, subtitle, brands }: { title: string; subtitle: str
             <tbody className="divide-y divide-[var(--line)]">
               {visible.map((brand) => (
                 <tr key={brand.marca} className="transition hover:bg-[#f8fafb]">
-                  <th scope="row" className="sticky left-0 bg-white px-5 py-2.5 font-semibold text-[var(--navy)]">{brand.marca}</th>
+                  <th scope="row" className="sticky left-0 bg-white px-5 py-2.5 font-semibold text-[var(--navy)]">
+                    <Link
+                      href={`/areas/compras?vista=gestion&marca=${encodeURIComponent(brand.marca)}`}
+                      prefetch={false}
+                      title={`Ver gestión de ${brand.marca}`}
+                      className="rounded-sm text-[var(--blue)] underline underline-offset-2 transition hover:text-[var(--navy)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue)]"
+                    >
+                      {brand.marca}
+                    </Link>
+                  </th>
                   <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-red-700">{number(brand.sinStock)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{number(brand.urgente)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{number(brand.comprar)}</td>
@@ -217,7 +226,7 @@ function DashboardContent({ dashboard }: { dashboard: ComprasDashboard }) {
   );
 }
 
-export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ vista?: string | string[]; sku?: string | string[] }> }) {
+export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ vista?: string | string[]; sku?: string | string[]; marca?: string | string[] }> }) {
   const session = await auth();
   if (!session?.user?.email || !isPortalUserAllowed(session.user.email)) return null;
   const params = await searchParams;
@@ -235,6 +244,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const isTransferencias = vista === "transferencias";
   const isWide = isGestion || isCotizaciones || isBandeja || isProceso || isPacking || isContenedores || isSeguimiento || isRecepciones || isTransferencias;
   const historialSku = typeof params.sku === "string" ? params.sku.trim().slice(0, 100) : "";
+  const requestedBrand = isGestion && typeof params.marca === "string" ? params.marca.trim().slice(0, 120) : "";
 
   let dashboard: ComprasDashboard | null = null;
   let gestion: ComprasGestion | null = null;
@@ -416,7 +426,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               <p className="mt-1 text-sm">{error}</p>
             </div>
           </div>
-        ) : isHistorial ? <ComprasHistorialWorkspace sku={historialSku} historial={historial} error={error} /> : isGestion && gestion ? <ComprasGestionWorkspace gestion={gestion} /> : isBandeja && bandeja ? <ComprasBandejaWorkspace data={bandeja} /> : isProceso && proceso ? <ComprasProcesoWorkspace data={proceso} /> : isPacking && packing ? <ComprasPackingWorkspace data={packing} /> : isContenedores && contenedores ? <ComprasContenedoresWorkspace data={contenedores} /> : isSeguimiento && seguimiento ? <ComprasSeguimientoWorkspace data={seguimiento} /> : isRecepciones && recepciones ? <ComprasRecepcionesWorkspace data={recepciones} /> : isTransferencias && transferencias ? <ComprasTransferenciasWorkspace data={transferencias} /> : isEnvios && envios ? <ComprasEnviosWorkspace data={envios} /> : isCotizaciones && cotizaciones ? <ComprasCotizacionesWorkspace data={cotizaciones} /> : dashboard ? <DashboardContent dashboard={dashboard} /> : null}
+        ) : isHistorial ? <ComprasHistorialWorkspace sku={historialSku} historial={historial} error={error} /> : isGestion && gestion ? <ComprasGestionWorkspace key={requestedBrand} gestion={gestion} initialBrand={resolveGestionBrand(gestion.marcas, requestedBrand)} /> : isBandeja && bandeja ? <ComprasBandejaWorkspace data={bandeja} /> : isProceso && proceso ? <ComprasProcesoWorkspace data={proceso} /> : isPacking && packing ? <ComprasPackingWorkspace data={packing} /> : isContenedores && contenedores ? <ComprasContenedoresWorkspace data={contenedores} /> : isSeguimiento && seguimiento ? <ComprasSeguimientoWorkspace data={seguimiento} /> : isRecepciones && recepciones ? <ComprasRecepcionesWorkspace data={recepciones} /> : isTransferencias && transferencias ? <ComprasTransferenciasWorkspace data={transferencias} /> : isEnvios && envios ? <ComprasEnviosWorkspace data={envios} /> : isCotizaciones && cotizaciones ? <ComprasCotizacionesWorkspace data={cotizaciones} /> : dashboard ? <DashboardContent dashboard={dashboard} /> : null}
       </main>
     </div>
   );

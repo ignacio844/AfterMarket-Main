@@ -16,10 +16,10 @@ function input() {
       ["KLILED", "LUX", 10, 0, 999, 999, 999, 0, 0, 0, 0, "OK", 0],
       ["ZERO", "LUX", 0, 4, 999, 999, 999, 0, 9, 9, 9, "OK", 9],
     ],
-    detalle: [["ITEM", "SKU", "CANTIDAD", "CANTIDAD_PENDIENTE", "STATUS_LINEA"],
-      ["LED", "KLILED", 5, 1, "EMBARCADO"],
-      ["LED", "KLILED", 5, 5, "EN FABRICA"],
-      ["LED", "KLILED", 7, 7, "A EMBARCAR"],
+    ordenes: [
+      { item: "LED", cantidad: 5, status: "EMBARCADO" },
+      { item: "LED", cantidad: 5, status: "EN FABRICA" },
+      { item: "LED", cantidad: 7, status: "A EMBARCAR" },
     ],
     mapaSku: [["CODIGO_NUEVO", "CODIGO_VIEJO"], ["LED", "OLDLED"], ["KLILED", ""]],
     pendientesEquivalencia: [["ITEM", "SKU_CANONICO"]],
@@ -33,7 +33,7 @@ function input() {
   };
 }
 
-test("recalcula B12B, B13 y B14 sobre una copia sin usar SKU directo ni CANTIDAD_PENDIENTE", () => {
+test("recalcula B12B, B13 y B14 desde el snapshot original de órdenes", () => {
   const source = input();
   const result = applyLegacyComprasMetricsToDashboardModel(source);
   assert.deepEqual(result[2].slice(4), [10, 5, 5, 5, 0, 1, 40, "COMPRAR", 80]);
@@ -53,9 +53,27 @@ test("recalcula B12B, B13 y B14 sobre una copia sin usar SKU directo ni CANTIDAD
 
 test("usa equivalencia validada sólo cuando MAPA_SKU no resuelve ITEM", () => {
   const source = input();
-  source.detalle[1][0] = "MANUAL";
+  source.ordenes[0].item = "MANUAL";
   source.pendientesEquivalencia.push(["MANUAL", "KLILED"]);
   const result = applyLegacyComprasMetricsToDashboardModel(source);
   assert.equal(result[2][4], 5);
   assert.equal(result[3][4], 5);
+});
+
+test("una orden ausente del snapshot deja de contar como pendiente", () => {
+  const source = input();
+  source.ordenes = [];
+  const result = applyLegacyComprasMetricsToDashboardModel(source);
+  assert.equal(result[2][4], 0);
+  assert.equal(result[2][5], 0);
+  assert.equal(result[2][6], 0);
+  assert.equal(source.modelo[2][4], 999);
+});
+
+test("INGRESADO y A INGRESAR dejan de contar aun si aparecían antes como EMBARCADO", () => {
+  const source = input();
+  source.ordenes[0].status = "INGRESADO";
+  source.ordenes[1].status = "A INGRESAR";
+  const result = applyLegacyComprasMetricsToDashboardModel(source);
+  assert.equal(result[2][4], 0);
 });

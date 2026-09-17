@@ -29,7 +29,7 @@ import {
   applyVentasDemandToDashboardModel,
   canonicalizeVentasDemand,
 } from "@/lib/compras-ventas-model";
-import { getOrdenesFreshnessRows } from "@/lib/compras-ordenes-supabase";
+import { getComprasOrdenesActual, ordenesFreshnessRows } from "@/lib/compras-ordenes-supabase";
 import { reconcileComprasPending, type PendingReconciliation } from "@/lib/compras-pending-reconciliation";
 import { applyLegacyComprasMetricsToDashboardModel } from "@/lib/compras-dashboard-model";
 import { readComprasMirroredSheets } from "@/lib/compras-sheet-supabase";
@@ -139,12 +139,12 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
 
   const [{ sheets }, warnes, ventas, ordenes] = await Promise.all([
     readDashboardSheets(
-      ["modelo", "config", "alias", "controlStock", "mapaSku", "detalleImportaciones", "pendientesEquivalencia", "parametros", "marcas"],
+      ["modelo", "config", "alias", "controlStock", "mapaSku", "pendientesEquivalencia", "parametros", "marcas"],
       "modelo",
     ),
     getComprasStockWarnesActual(),
     getComprasVentasActual(),
-    getOrdenesFreshnessRows(),
+    getComprasOrdenesActual(),
   ]);
 
   const updatedModel = applyVentasDemandToDashboardModel(
@@ -159,7 +159,7 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
     ...sheets,
     modelo: applyLegacyComprasMetricsToDashboardModel({
       modelo: updatedModel,
-      detalle: sheets.detalleImportaciones,
+      ordenes: ordenes.items,
       mapaSku: sheets.mapaSku,
       pendientesEquivalencia: sheets.pendientesEquivalencia,
       parametros: sheets.parametros,
@@ -170,7 +170,7 @@ export async function getComprasDashboard(): Promise<ComprasDashboard> {
       warnes.fechaImportacionEscobar,
     ),
     ventas: ventasFreshnessRows(ventas.fechaImportacion),
-    logImportaciones: ordenes,
+    logImportaciones: ordenesFreshnessRows(ordenes.fechaImportacion),
   };
 
   return calculateComprasDashboard(dashboardSheets, email);

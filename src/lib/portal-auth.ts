@@ -7,6 +7,11 @@ const portalAllowedDomain = "grupo-aftermarket.com";
 // Si esta lista contiene correos, reemplaza la autorización general por dominio.
 const portalAllowedEmails: string[] = [];
 
+// Accesos individuales fuera del dominio corporativo.
+const externalPortalUsers = [
+  "marcos@distrimar.com.ar",
+];
+
 const portalEditors = [
   "ignacio@grupo-aftermarket.com",
   "etelias@grupo-aftermarket.com",
@@ -16,6 +21,7 @@ const portalEditors = [
 const executiveViewers = [
   "ignacio@grupo-aftermarket.com",
   "etelias@grupo-aftermarket.com",
+  "marcos@distrimar.com.ar",
 ];
 
 function includesNormalizedEmail(emails: readonly string[], email: string | null | undefined) {
@@ -34,7 +40,9 @@ export function isExecutiveViewer(email: string | null | undefined) {
 
 export function isPortalUserAllowed(email: string | null | undefined) {
   if (!email) return false;
-  const normalizedEmail = email.toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (includesNormalizedEmail(externalPortalUsers, normalizedEmail)) return true;
 
   if (portalAllowedEmails.length > 0) {
     return portalAllowedEmails.some((allowedEmail) => allowedEmail.toLowerCase() === normalizedEmail);

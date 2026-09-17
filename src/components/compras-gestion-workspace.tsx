@@ -103,8 +103,8 @@ function Risk({ value }: { value: string }) {
   return <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold whitespace-nowrap ${tone}`}>{value || "—"}</span>;
 }
 
-export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }) {
-  const [filters, setFilters] = useState<GestionFilters>(blankFilters);
+export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestion: ComprasGestion; initialBrand?: string }) {
+  const [filters, setFilters] = useState<GestionFilters>(() => ({ ...blankFilters, marca: initialBrand }));
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<GestionRegistro | null>(null);
   const [draft, setDraft] = useState<GestionDraft>(blankDraft);
@@ -150,6 +150,9 @@ export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }
   const start = (visiblePage - 1) * PAGE_SIZE;
   const visible = filtered.slice(start, start + PAGE_SIZE);
   const activeFilters = Object.values(filters).some(Boolean);
+  const brandOptions = filters.marca && !gestion.marcas.includes(filters.marca)
+    ? [filters.marca, ...gestion.marcas]
+    : gestion.marcas;
 
   const selectedFilteredCount = useMemo(
     () => filtered.reduce((total, registro) => total + (selectedSkus.has(registro.sku) ? 1 : 0), 0),
@@ -261,7 +264,7 @@ export function ComprasGestionWorkspace({ gestion }: { gestion: ComprasGestion }
           </label>
           <Select label="Riesgo" value={filters.riesgo} options={gestion.riesgos} placeholder="Todos" onChange={(v) => setFilter("riesgo", v)} />
           <Select label="Estado" value={filters.estado} options={gestion.estados} placeholder="Todos" onChange={(v) => setFilter("estado", v)} />
-          <Select label="Marca" value={filters.marca} options={gestion.marcas} placeholder="Todas" onChange={(v) => setFilter("marca", v)} />
+          <Select label="Marca" value={filters.marca} options={brandOptions} placeholder="Todas" onChange={(v) => setFilter("marca", v)} />
           <Select label="Política" value={filters.politica} options={["COMPRAR", "NO COMPRAR"]} placeholder="Todas" onChange={(v) => setFilter("politica", v)} />
         </div>
         <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--line)] pt-3">

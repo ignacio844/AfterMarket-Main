@@ -31,6 +31,8 @@ No modificar otras secciones del portal salvo lo estrictamente necesario para Co
 
 La navegación actual sigue el flujo: Dashboard → Gestión → Cotizaciones → Bandeja → Enviados → En proceso → Packing List → Contenedores → Seguimiento → Más (Recepciones, Historial SKU y Transferencias).
 
+En las tablas de marcas importadas y nacionales del Dashboard, el nombre de cada marca enlaza a Gestión con el filtro de esa marca seleccionado. La URL conserva `vista=gestion&marca=...`; si la marca no tiene registros de Gestión, se muestra el filtro y cero resultados, no todas las marcas.
+
 La vista de Gestión muestra las columnas SKU, descripción, marca, origen, objetivo, cobertura actual, riesgo, política, compra sugerida, estado, cantidad decidida, responsable, observación, fecha de decisión y acción. La tabla tiene diseño compacto y la vista admite hasta 1920 px de ancho. Se comprobó en el navegador del portal a 1282 px de viewport que las 15 columnas entran sin desbordamiento horizontal; por debajo de aproximadamente 1250 px puede aparecer desplazamiento horizontal para conservar todas las columnas.
 
 Los botones **Gestionar** e **Historial** son visibles en cada fila. **Gestionar** abre un panel prototipo con SKU, descripción, marca, riesgo y compra sugerida; permite cambiar localmente estado de gestión, cantidad decidida y observación (máximo 1000 caracteres). **Guardar** permanece deshabilitado: cerrar descarta el borrador y no modifica la tabla ni Google Sheets. **Historial** navega a la vista Historial SKU con el código precargado, como `irHistorialSku()` en Apps Script, y consulta los datos reales al abrirse. En la tabla, `Cantidad decidida` es texto, no un campo editable.
@@ -48,20 +50,20 @@ El Dashboard en `/areas/compras` conserva la lógica de `obtenerDashboardPortalC
 La fuente del Dashboard es **Supabase con un espejo temporal del legacy** (pendiente de despliegue del código de esta etapa):
 
 1. `src/lib/compras-sheets.ts` lee en paralelo el espejo validado de Sheets en Supabase y los snapshots vigentes de Warnes, Escobar, Ventas y Órdenes. `COMPRAS_DASHBOARD_SHEET_SOURCE=SHEETS` permite volver temporalmente a la lectura original si se necesita recuperación.
-2. El espejo contiene `MODELO_COMPRAS`, configuración y alias de marcas, `MAPA_SKU` y `CONTROL_IMPORTACIONES_STOCK`, más `DETALLE_IMPORTACIONES`, equivalencias, `PARAMETROS_COMPRAS` y `MARCAS` para recalcular el modelo. La frescura de Órdenes ya no depende de `LOG_IMPORTACIONES`.
+2. El Dashboard consume del espejo `MODELO_COMPRAS`, configuración y alias de marcas, `MAPA_SKU`, `CONTROL_IMPORTACIONES_STOCK`, `PENDIENTES_EQUIVALENCIA_IMPORT`, `PARAMETROS_COMPRAS` y `MARCAS`. El espejo conserva `DETALLE_IMPORTACIONES` para diagnóstico y otras vistas; el pendiente del Dashboard se calcula desde el snapshot independiente de Órdenes.
 3. `src/lib/compras-stock-supabase.ts` pagina la vista `compras_stock_actual_por_sku` de Supabase y obtiene `stock_warnes`, fecha e ID de importación.
 4. Antes de calcular el Dashboard, `applyWarnesStockToDashboardModel()` reemplaza en memoria `STOCK_WARNES` y, cuando existe un snapshot Escobar validado, también `STOCK_ESCOBAR` por SKU. Un SKU ausente del snapshot completo de su depósito se considera `0`. Luego recalcula `STOCK_TOTAL` con ambos depósitos de Supabase; sin snapshot Escobar conserva el valor legacy.
-5. Las fechas de importación de Warnes, Escobar y Órdenes se reemplazan en memoria para que las tarjetas de frescura reflejen los snapshots reales de Supabase. De Órdenes se consume sólo esa fecha; todavía no se inyectan cantidades por SKU.
+5. Las fechas de importación de Warnes, Escobar y Órdenes se reemplazan en memoria para que las tarjetas de frescura reflejen los snapshots reales de Supabase. De Órdenes se leen también las líneas del último snapshot validado para calcular el pendiente por SKU.
 6. `src/lib/compras-ventas-model.ts` aplica `MAPA_SKU` como el legacy y reemplaza en memoria sólo `CONSUMO_12_MESES` (agosto 2025 a julio 2026) y `PROMEDIO_MENSUAL` (suma / 12) desde Supabase.
-7. `applyLegacyComprasMetricsToDashboardModel()` reproduce en memoria B12B (pendiente), la cobertura objetivo de B13 y las fórmulas B14 de cobertura, riesgo, prioridad y compra sugerida. `calculateComprasDashboard()` agrupa los KPIs resultantes sin modificar ninguna fuente.
+7. `applyLegacyComprasMetricsToDashboardModel()` conserva en memoria la regla B12B de estados (`EN FABRICA` y `EMBARCADO`) y el cruce `ITEM → SKU`, ahora sobre el XLSX de seguimiento original. Después recalcula la cobertura objetivo de B13 y las fórmulas B14 de cobertura, riesgo, prioridad y compra sugerida. `calculateComprasDashboard()` agrupa los KPIs sin modificar ninguna fuente.
 
-**Límite de la fuente:** el stock y las ventas sí usan sus snapshots automáticos actuales. El pendiente sigue la fórmula exacta de Apps Script sobre `DETALLE_IMPORTACIONES` espejada desde el Sheet; el XLSX de Órdenes alimenta por ahora la tarjeta de frescura, no reemplaza ese detalle, porque no representa por sí solo las recepciones y cantidades pendientes. El modelo base todavía aporta el catálogo SKU y la marca. Este código está implementado localmente, no desplegado.
+**Alcance de la fuente:** por confirmación del usuario, el XLSX original es autoritativo para el seguimiento de Órdenes: una orden ausente dejó de estar pendiente. No se mezclan sus líneas con `DETALLE_IMPORTACIONES` ni se conservan órdenes desaparecidas. Los campos de recepción (`CANTIDAD_RECIBIDA`, `CANTIDAD_PENDIENTE`, `ID_DETALLE`) siguen perteneciendo a `DETALLE_IMPORTACIONES`; la regla B12B del Dashboard continúa usando cantidad original, no saldo de recepción. El modelo base todavía aporta catálogo SKU y marca. Este cambio está implementado localmente, no desplegado.
 
 ### Dashboard — diagnóstico de conciliación (implementado)
 
-`GET /api/compras/dashboard-reconciliation` ofrece a usuarios autorizados del portal un diagnóstico **de sólo lectura** sobre el modelo, el detalle y las equivalencias legacy. No se llama al cargar el Dashboard. Compara el pendiente persistido, la fórmula B12B reproducida ahora por el Dashboard (`CANTIDAD`, `ITEM → SKU`, sólo `EN FABRICA` y `EMBARCADO`) y una proyección alternativa con `CANTIDAD_PENDIENTE` en cuatro estados. Esta última **no** alimenta el KPI. Informa filas sin cruce, claves ambiguas, totales por estado y las mayores diferencias por SKU.
+`GET /api/compras/dashboard-reconciliation` ofrece a usuarios autorizados del portal un diagnóstico **de sólo lectura** sobre el modelo, el detalle y las equivalencias legacy. No se llama al cargar el Dashboard. Compara el pendiente persistido, la antigua fórmula B12B sobre `DETALLE_IMPORTACIONES` y una proyección alternativa con `CANTIDAD_PENDIENTE` en cuatro estados. Ninguna de esas dos proyecciones alimenta ya el KPI; éste lee el snapshot de Órdenes. El diagnóstico informa filas sin cruce, claves ambiguas, totales por estado y las mayores diferencias por SKU.
 
-Se conserva por ahora la ventana legacy de Ventas (agosto 2025–julio 2026), conforme a la instrucción de replicar esa lógica. La fecha de importación no implica que esa ventana se haya desplazado. La proyección de cuatro estados y saldo pendiente queda como análisis para un cambio funcional posterior, no como condición de la migración exacta. El XLSX de `ORDENES` no se presume equivalente a `DETALLE_IMPORTACIONES`.
+Se conserva por ahora la ventana legacy de Ventas (agosto 2025–julio 2026), conforme a la instrucción de replicar esa lógica. La fecha de importación no implica que esa ventana se haya desplazado. La proyección de cuatro estados y saldo pendiente queda como análisis para un cambio funcional posterior. El XLSX de `ORDENES` no reemplaza los campos de recepción de `DETALLE_IMPORTACIONES`.
 
 ### Dashboard — fase 2 de espejo Supabase (implementada localmente)
 
@@ -69,7 +71,7 @@ La migración `008_compras_sheet_mirror.sql` fue aplicada al Supabase vinculado.
 
 El código del Dashboard y de la conciliación lee por defecto ese lote desde Supabase, pagina las filas y confirma que el ID del lote no cambió durante la lectura. El puente puede revisar el Sheet cada dos horas sin escribirle y el supervisor local lo arrancará en `127.0.0.1:8793` al tomar la nueva versión del script. **Aún no hay commit, push ni despliegue de este código**, y no se ha verificado la presentación en el portal desplegado. El resto de las vistas de Compras conserva sus lecturas directas de Sheets; esta etapa no migra Gestión, Cotizaciones, Seguimiento, Recepciones ni otras vistas.
 
-La conciliación alternativa incorpora `EQUIVALENCIAS_SKU` y `ORDENES` para estudiar proveedor+ITEM, SKU directo y otros cruces. La ruta productiva, en cambio, conserva deliberadamente la prioridad y los estados de B12B, aun cuando eso deje excepciones, para no introducir reglas de negocio nuevas de forma inadvertida.
+La conciliación alternativa incorpora `EQUIVALENCIAS_SKU` y `ORDENES` para estudiar proveedor+ITEM, SKU directo y otros cruces. La ruta productiva conserva deliberadamente la prioridad de mapeo y los dos estados de B12B, pero aplica la fuente original de Órdenes confirmada por el usuario.
 
 ### Dashboard — paso 1 de cierre: conciliación real de pendientes
 
@@ -248,21 +250,20 @@ el snapshot #1 sin duplicarlo; la próxima revisión quedó para el 17/09 a las
 
 **Estado de conexión con el Dashboard:** la ingesta, el botón manual, la
 programación diaria, la migración SQL y la lectura de la fecha del último
-snapshot validado están implementados. El commit `b13da87` está en `main`
-remoto. Falta verificar visualmente en el portal desplegado que el botón
-manual y la fecha de frescura se muestren y funcionen; el push por sí solo no
-demuestra que haya terminado el despliegue.
+snapshot validado están implementados. El Dashboard local también pagina las
+líneas de ese snapshot, confirma que no cambió durante la lectura y recalcula
+el pendiente. Este último cambio aún requiere despliegue y validación visual.
 
 La vista de Seguimiento y Recepciones sigue leyendo la hoja `ORDENES` del
 legacy. En el Dashboard, `PENDIENTE_TOTAL`, `EMBARCADO`, `EN_FABRICA`, `RIESGO`
-y `COMPRA_SUGERIDA` se recalculan ahora en memoria con el detalle espejado.
-El detalle canónico de recepción logística usa
-`DETALLE_IMPORTACIONES.STATUS_LINEA` y `CANTIDAD_PENDIENTE`. La rutina B12B
-que efectivamente calcula el KPI del Dashboard, en cambio, suma `CANTIDAD`
-original en sólo dos estados. Ambos conceptos están separados; no derivar
-ninguno sólo del Excel de órdenes.
+y `COMPRA_SUGERIDA` se recalculan en memoria desde el snapshot original de
+Órdenes. Una orden que desaparece del archivo deja de contar, sin rescatar
+líneas antiguas del detalle espejado. El detalle de recepción logística
+conserva `DETALLE_IMPORTACIONES.STATUS_LINEA`, `CANTIDAD_PENDIENTE` y
+`CANTIDAD_RECIBIDA` para esa vista; no se reemplaza por el XLSX.
 
-El port exacto de B12B usa `CANTIDAD` original y los dos estados legacy.
+La regla B12B conservada usa `CANTIDAD` original y los dos estados legacy,
+pero cambia de `DETALLE_IMPORTACIONES` al seguimiento autoritativo del XLSX.
 Adoptar `CANTIDAD_PENDIENTE` y los cuatro estados logísticos sería una mejora
 funcional posterior, distinta de la migración exacta; el informe de
 conciliación conserva esa proyección sin aplicarla.
@@ -340,7 +341,7 @@ Este proyecto usa Next.js 16.3.4. Antes de modificar código Next, consultar la 
 
 Para retomar, leer primero este archivo completo y `AGENTS.md`, verificar rama y `git status`, y leer las guías relevantes de `node_modules/next/dist/docs/` antes de tocar código Next.js. El estado base esperado incluye las migraciones `003` y `004`, el workflow `sync-warnes-stock.yml`, el worker `workers/wms-stock/` y el botón de Warnes en el Dashboard.
 
-Ventas Hitos 1 y 2, la ingesta temporal de Escobar y la ingesta/frescura de Órdenes están implementados. Proteger sus workers locales y la sincronización Warnes ya validada. El Dashboard dispone localmente del port en memoria de B12B/B13/B14 y de un informe de conciliación; falta commit/push, despliegue y validación funcional en el portal. No interpretar el desacuerdo de totales con la captura del 16/09 como error por sí mismo: las fechas de carga de las cuatro fuentes difieren.
+Ventas Hitos 1 y 2, la ingesta temporal de Escobar y la ingesta/frescura de Órdenes están implementados. Proteger sus workers locales y la sincronización Warnes ya validada. El Dashboard dispone localmente del cálculo en memoria de B12B/B13/B14, ahora alimentado por el snapshot original de Órdenes, y de un informe de conciliación histórica con `DETALLE_IMPORTACIONES`; falta commit/push, despliegue y validación funcional en el portal. No interpretar el desacuerdo de totales con la captura del 16/09 como error por sí mismo: las fechas de carga de las cuatro fuentes difieren.
 
 ### Prompt sugerido para una conversación nueva
 
@@ -352,11 +353,11 @@ Stock Escobar y la ingesta/frescura de Órdenes están implementados. No rompas
 esas conexiones. Google Sheets sigue siendo sólo lectura y las credenciales
 nunca deben llegar al navegador.
 
-Verificá el port local del Dashboard que aplica B12B/B13/B14 en memoria sobre
+Verificá el cálculo local del Dashboard que aplica B12B/B13/B14 en memoria sobre
 snapshots de Supabase; después desplegalo y validá KPI, exportación y frescura
-en el portal. Apps Script usa `DETALLE_IMPORTACIONES.CANTIDAD` y sólo dos
-estados para su `PENDIENTE_TOTAL`; no confundas esa paridad de reglas con la
-proyección alternativa de cantidad pendiente y cuatro estados. La captura
-legacy del 16/09 muestra fuentes más antiguas que los snapshots automáticos.
+en el portal. El pendiente usa el XLSX autoritativo de Órdenes, no el detalle
+espejado, pero mantiene los dos estados de la regla B12B. Una orden ausente
+del XLSX ya no está pendiente. El detalle sigue siendo fuente de recepción.
+La captura legacy del 16/09 muestra fuentes más antiguas que los snapshots automáticos.
 No escribas en Google Sheets, no expongas secretos y evitá pruebas innecesarias.
 ```

@@ -52,20 +52,19 @@ function legacySkuMap(mapaSku: SheetRows, pendientesEquivalencia: SheetRows) {
   return result;
 }
 
-function legacyPending(detalle: SheetRows, equivalencias: Map<string, string>) {
-  const item = required(detalle, 0, "ITEM");
-  const quantity = required(detalle, 0, "CANTIDAD");
-  const status = required(detalle, 0, "STATUS_LINEA");
+export type ComprasOrdenesPendienteItem = { item: string; cantidad: number; status: string };
+
+function ordersPending(ordenes: ComprasOrdenesPendienteItem[], equivalencias: Map<string, string>) {
   const result = new Map<string, { embarcado: number; fabrica: number }>();
-  for (const row of detalle.slice(1)) {
-    const source = code(value(row, item));
+  for (const row of ordenes) {
+    const source = code(row.item);
     if (!source) continue;
     const sku = equivalencias.get(source);
     if (!sku) continue;
-    const state = normalizedText(value(row, status));
+    const state = normalizedText(row.status);
     if (state !== "EMBARCADO" && state !== "EN FABRICA") continue;
     const entry = result.get(sku) ?? { embarcado: 0, fabrica: 0 };
-    const amount = importQuantity(value(row, quantity));
+    const amount = importQuantity(row.cantidad);
     if (state === "EMBARCADO") entry.embarcado += amount;
     else entry.fabrica += amount;
     result.set(sku, entry);
@@ -109,16 +108,16 @@ function brandCoverage(rows: SheetRows) {
   return result;
 }
 
-/** B12B -> B13 (Dashboard-relevant columns) -> B14, on a private in-memory copy. */
+/** B12B status rule on authoritative Orders -> B13 -> B14, on a private in-memory copy. */
 export function applyLegacyComprasMetricsToDashboardModel(input: {
   modelo: SheetRows;
-  detalle: SheetRows;
+  ordenes: ComprasOrdenesPendienteItem[];
   mapaSku: SheetRows;
   pendientesEquivalencia: SheetRows;
   parametros: SheetRows;
   marcas: SheetRows;
 }): SheetRows {
-  const { modelo, detalle, mapaSku, pendientesEquivalencia, parametros, marcas } = input;
+  const { modelo, ordenes, mapaSku, pendientesEquivalencia, parametros, marcas } = input;
   if (modelo.length < 2) throw new Error("MODELO_COMPRAS no contiene encabezados.");
   const result = modelo.map((row) => [...row]);
   const sku = required(result, 1, "SKU");
@@ -135,7 +134,7 @@ export function applyLegacyComprasMetricsToDashboardModel(input: {
   const risk = required(result, 1, "RIESGO");
   const priority = required(result, 1, "PRIORIDAD");
 
-  const importations = legacyPending(detalle, legacySkuMap(mapaSku, pendientesEquivalencia));
+  const importations = ordersPending(ordenes, legacySkuMap(mapaSku, pendientesEquivalencia));
   const config = parameters(parametros);
   const coverageByBrand = brandCoverage(marcas);
   const defaultCoverage = config.generalB13.get("COBERTURA_DEFAULT_MESES") || 4;

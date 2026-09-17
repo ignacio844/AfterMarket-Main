@@ -74,9 +74,15 @@ const report = reconcileComprasPending({
   equivalenciasSku: values.EQUIVALENCIAS_SKU,
   ordenes: values.ORDENES,
 });
+const detailColumn = columns(values.DETALLE_IMPORTACIONES[0]);
 const recalculatedModel = applyLegacyComprasMetricsToDashboardModel({
   modelo: values.MODELO_COMPRAS,
-  detalle: values.DETALLE_IMPORTACIONES,
+  // Preview histórico: este informe sigue contrastando el cálculo anterior del Sheet.
+  ordenes: values.DETALLE_IMPORTACIONES.slice(1).map((row) => ({
+    item: String(row[detailColumn("ITEM")] ?? ""),
+    cantidad: dashboardNumber(row[detailColumn("CANTIDAD")]),
+    status: String(row[detailColumn("STATUS_LINEA")] ?? ""),
+  })),
   mapaSku: values.MAPA_SKU,
   pendientesEquivalencia: values.PENDIENTES_EQUIVALENCIA_IMPORT,
   parametros: values.PARAMETROS_COMPRAS,

@@ -14,7 +14,7 @@ registerHooks({
   },
 });
 
-const { calculateComprasGestion, filterGestion, summarizeGestion } = await import("../src/lib/compras-gestion.ts");
+const { calculateComprasGestion, filterGestion, resolveGestionBrand, summarizeGestion } = await import("../src/lib/compras-gestion.ts");
 const now = new Date("2026-09-14T15:00:00.000Z");
 
 function sheets(overrides = {}) {
@@ -61,6 +61,15 @@ test("keeps legacy filter and summary semantics over the filtered rows", () => {
   assert.deepEqual(filterGestion(records, { ...blank, marca: "LOCAL", estado: "APROBADO", politica: "COMPRAR" }).map((r) => r.sku), ["B"]);
   assert.deepEqual(filterGestion(records, { ...blank, politica: "NO COMPRAR" }).map((r) => r.sku), ["C"]);
   assert.deepEqual(summarizeGestion(filterGestion(records, { ...blank, riesgo: "SIN STOCK" })), { total: 1, pendientes: 1, conDecision: 0, compraSugerida: 12.5 });
+});
+
+test("resolves a Dashboard brand to the Gestion filter without silently showing all brands", () => {
+  const gestion = calculateComprasGestion(sheets(), now);
+  assert.equal(resolveGestionBrand(gestion.marcas, "hid xenon"), "HID-XENON");
+  assert.deepEqual(filterGestion(gestion.registros, {
+    texto: "", riesgo: "", estado: "", marca: resolveGestionBrand(gestion.marcas, "hid xenon"), politica: "",
+  }).map((row) => row.sku), ["A"]);
+  assert.equal(resolveGestionBrand(gestion.marcas, "MARCA SIN REGISTROS"), "MARCA SIN REGISTROS");
 });
 
 test("handles empty Gestion and rejects missing required columns", () => {

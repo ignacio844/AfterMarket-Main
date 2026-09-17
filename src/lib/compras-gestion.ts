@@ -39,6 +39,14 @@ export type GestionFilters = {
   politica: string;
 };
 
+export function resolveGestionBrand(marcas: string[], requested: string) {
+  const brand = requested.trim();
+  if (!brand) return "";
+  if (marcas.includes(brand)) return brand;
+  const matches = marcas.filter((option) => normalizeBrand(option) === normalizeBrand(brand));
+  return matches.length === 1 ? matches[0] : brand;
+}
+
 export const GESTION_ESTADOS = [
   "PENDIENTE", "COTIZAR", "APROBADO", "NO COMPRAR", "POSTERGAR", "ENVIADO A COMPRA",
 ];
