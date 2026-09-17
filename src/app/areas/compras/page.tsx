@@ -300,7 +300,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const isRecepciones = vista === "recepciones";
   const isTransferencias = vista === "transferencias";
   const isDashboard = !isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias;
-  const isWide = isGestion || isCotizaciones || isBandeja || isProceso || isPacking || isContenedores || isSeguimiento || isRecepciones || isTransferencias;
   const historialSku = typeof params.sku === "string" ? params.sku.trim().slice(0, 100) : "";
   const requestedBrand = isGestion && typeof params.marca === "string" ? params.marca.trim().slice(0, 120) : "";
 
@@ -311,7 +310,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="min-h-screen bg-[var(--canvas)] text-[var(--ink)]">
-      <main className={`mx-auto ${isWide ? "max-w-[1920px] px-4 py-5 lg:px-5 lg:py-6" : "max-w-[1440px] px-5 py-8 lg:px-10 lg:py-10"}`}>
+      <main className="mx-auto max-w-[1920px] px-4 py-5 lg:px-5 lg:py-6">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <nav
             aria-label="Vistas de Compras"

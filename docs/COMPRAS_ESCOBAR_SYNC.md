@@ -54,3 +54,13 @@ El primer snapshot validado fue `16-09 INV GRAL.xlsx`, importación #5 del
 Escobar; la diferencia se conserva como señal de que el modelo persistido no
 equivale a la nueva regla/fecha, no como motivo para incluir categorías
 explícitamente excluidas.
+
+El archivo `17-09 INV GRAL.xlsx` contenía en la fila 9520 el SKU `MB_211`,
+`Saldo = -24`, depósito `DISTRIMAR B`. Por indicación del usuario se omitió
+**sólo esa fila** mediante una ejecución puntual con
+`--once --skip-confirmed-row-9520`. El parser verifica archivo, fecha, fila y
+valores exactos; todos los demás saldos negativos siguen siendo errores.
+La importación #8 quedó `VALIDADO`, con 24.401 filas de origen, 18.506
+incluidas, 5.894 excluidas por depósito y una rechazada explícitamente;
+14.032 SKU y 7.473.709 unidades. La omisión está registrada en
+`metadata.ignoredRows` y `filas_rechazadas`.

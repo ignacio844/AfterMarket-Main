@@ -123,7 +123,7 @@ async function publish(file, parsed, supabase) {
   await validateAgainstPrevious(parsed, supabase);
   const now = new Date().toISOString();
   const metadata = {
-    parserVersion: "octosis-drive-escobar-v1",
+    parserVersion: "octosis-drive-escobar-v2",
     driveFileId: file.id,
     driveFolderId: FOLDER_ID,
     driveCreatedTime: file.createdTime,
@@ -133,6 +133,7 @@ async function publish(file, parsed, supabase) {
     totalStock: parsed.totalStock,
     includedRows: parsed.includedRows,
     excludedRows: parsed.excludedRows,
+    ignoredRows: parsed.ignoredRows,
     duplicateRows: parsed.duplicateRows,
     categoryRows: parsed.categoryRows,
     depositFilter: "exclude EXT|REV|INV|TEP",
@@ -148,7 +149,7 @@ async function publish(file, parsed, supabase) {
       estado: "PROCESANDO",
       filas_origen: parsed.sourceRows,
       filas_validas: parsed.uniqueSkus,
-      filas_rechazadas: 0,
+      filas_rechazadas: parsed.ignoredRows.length,
       metadata,
       updated_at: now,
     })
@@ -182,7 +183,7 @@ let lastError = null;
 let lastFile = null;
 let lastFileVersion = null;
 
-async function tick({ dryRun = false, localFile = null } = {}) {
+async function tick({ dryRun = false, localFile = null, skipConfirmedRow = false } = {}) {
   if (running) return;
   running = true;
   try {
@@ -210,10 +211,17 @@ async function tick({ dryRun = false, localFile = null } = {}) {
       url.searchParams.set("supportsAllDrives", "true");
       bytes = await driveGet(url, token, true);
     }
-    const parsed = await parseEscobarWorkbook(bytes, file.name);
+    if (skipConfirmedRow && (file.name !== "17-09 INV GRAL.xlsx" || localDate(new Date(file.createdTime)) !== "2026-09-17")) {
+      throw new Error("La exclusión de la fila 9520 sólo aplica al archivo Escobar del 17/09/2026.");
+    }
+    const parsed = await parseEscobarWorkbook(bytes, file.name, {
+      ignoredRows: skipConfirmedRow
+        ? [{ rowNumber: 9520, code: "MB_211", saldo: -24, deposito: "DISTRIMAR B" }]
+        : [],
+    });
     lastFile = file.name;
     if (dryRun) {
-      console.log(JSON.stringify({ file: file.name, sourceRows: parsed.sourceRows, includedRows: parsed.includedRows, excludedRows: parsed.excludedRows, uniqueSkus: parsed.uniqueSkus, totalStock: parsed.totalStock, categoryRows: parsed.categoryRows }));
+      console.log(JSON.stringify({ file: file.name, sourceRows: parsed.sourceRows, includedRows: parsed.includedRows, excludedRows: parsed.excludedRows, ignoredRows: parsed.ignoredRows, uniqueSkus: parsed.uniqueSkus, totalStock: parsed.totalStock, categoryRows: parsed.categoryRows }));
     } else {
       const result = await publish(file, parsed, supabaseClient());
       if (result.estado !== "VALIDADO") throw new Error(`El mismo archivo ya figura en estado ${result.estado} (importación #${result.importId}).`);
@@ -234,10 +242,12 @@ async function tick({ dryRun = false, localFile = null } = {}) {
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const once = process.argv.includes("--once") || dryRun;
+  const skipConfirmedRow = process.argv.includes("--skip-confirmed-row-9520");
   const localFileIndex = process.argv.indexOf("--file");
   const localFile = localFileIndex >= 0 ? process.argv[localFileIndex + 1] : null;
+  if (skipConfirmedRow && (!once || localFile)) throw new Error("La exclusión confirmada sólo se permite en una ejecución puntual desde Drive.");
   if (once) {
-    await tick({ dryRun, localFile });
+    await tick({ dryRun, localFile, skipConfirmedRow });
     if (lastError) process.exitCode = 1;
     return;
   }

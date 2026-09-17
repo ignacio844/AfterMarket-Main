@@ -25,7 +25,7 @@ function sku(value) {
   return text(value).replace(/\s+/g, "").toUpperCase();
 }
 
-export async function parseEscobarWorkbook(input, fileName) {
+export async function parseEscobarWorkbook(input, fileName, { ignoredRows = [] } = {}) {
   const buffer = Buffer.from(input);
   if (!/\.xlsx$/i.test(fileName) || buffer.length < 1000 || buffer.length > 20_000_000) {
     throw new Error("El inventario Escobar debe ser un XLSX válido de hasta 20 MB.");
@@ -47,6 +47,9 @@ export async function parseEscobarWorkbook(input, fileName) {
   let includedRows = 0;
   let excludedRows = 0;
   let duplicateRows = 0;
+  const ignoredRowsApplied = [];
+  const ignoredByNumber = new Map(ignoredRows.map((row) => [row.rowNumber, row]));
+  if (ignoredByNumber.size !== ignoredRows.length) throw new Error("Hay filas de Escobar duplicadas para excluir.");
 
   for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
     const row = sheet.getRow(rowNumber);
@@ -62,6 +65,14 @@ export async function parseEscobarWorkbook(input, fileName) {
 
     const code = sku(row.getCell(1).value);
     const saldo = row.getCell(2).value;
+    const ignored = ignoredByNumber.get(rowNumber);
+    if (ignored) {
+      if (code !== ignored.code || saldo !== ignored.saldo || deposito !== ignored.deposito) {
+        throw new Error(`Fila ${rowNumber}: la exclusión confirmada no coincide con el archivo.`);
+      }
+      ignoredRowsApplied.push({ rowNumber, code, saldo, deposito });
+      continue;
+    }
     if (!code || typeof saldo !== "number" || !Number.isFinite(saldo) || saldo < 0) {
       throw new Error(`Fila ${rowNumber}: Código o Saldo inválido en depósito incluido.`);
     }
@@ -69,6 +80,7 @@ export async function parseEscobarWorkbook(input, fileName) {
     if (stockBySku.has(code)) duplicateRows += 1;
     stockBySku.set(code, (stockBySku.get(code) ?? 0) + saldo);
   }
+  if (ignoredRowsApplied.length !== ignoredRows.length) throw new Error("No se encontró la fila confirmada para excluir de Escobar.");
 
   const items = [...stockBySku].map(([code, saldo]) => ({
     sku: code,
@@ -87,6 +99,7 @@ export async function parseEscobarWorkbook(input, fileName) {
     sourceRows,
     includedRows,
     excludedRows,
+    ignoredRows: ignoredRowsApplied,
     duplicateRows,
     uniqueSkus: items.length,
     totalStock,
