@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Download, Search, SlidersHorizontal, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Download, Search, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import {
   GESTION_ESTADOS,
   filterGestion,
@@ -17,6 +18,9 @@ const blankFilters: GestionFilters = { texto: "", riesgo: "", estado: "", marca:
 type GestionDraft = { estadoGestion: string; cantidadDecidida: string; observacion: string };
 const blankDraft: GestionDraft = { estadoGestion: "PENDIENTE", cantidadDecidida: "", observacion: "" };
 const whole = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
+const subscribeActionHost = () => () => {};
+const getActionHost = () => document.getElementById("compras-gestion-actions");
+const getServerActionHost = () => null;
 
 function number(value: number) {
   return whole.format(Math.round(value || 0));
@@ -82,12 +86,12 @@ function Select({ label, value, options, placeholder, onChange }: {
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex min-w-0 flex-col gap-1.5 text-[11px] font-semibold text-[var(--muted)]">
+    <label className="flex min-w-0 flex-col gap-1 text-[11px] font-semibold text-[var(--muted)]">
       {label}
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
+        className="h-9 w-full rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
       >
         <option value="">{placeholder}</option>
         {options.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -114,6 +118,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
   const [bulkObservation, setBulkObservation] = useState("");
   const [groupState, setGroupState] = useState("");
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
+  const actionHost = useSyncExternalStore(subscribeActionHost, getActionHost, getServerActionHost);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const selectVisibleRef = useRef<HTMLInputElement>(null);
 
@@ -201,64 +206,55 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
 
   return (
     <div className="mt-3 space-y-3">
-      <section className="rounded-[18px] border border-[var(--line)] bg-white px-4 py-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-[-0.025em] text-[var(--navy)]">Gestión de Compras</h2>
-            <p className="mt-1 text-xs text-[var(--muted)]">Actualizado: {gestion.actualizado || "Sin datos"}</p>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="flex min-w-[205px] flex-col gap-1 text-[11px] font-semibold text-[var(--muted)]">
-              Estado del grupo
-              <select
-                value={groupState}
-                onChange={(event) => setGroupState(event.target.value)}
-                className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
-              >
-                <option value="">Mantener estado actual</option>
-                {GESTION_ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
-              </select>
-            </label>
-
-            <button
-              type="button"
-              disabled
-              title="Se habilitará en la etapa 2, cuando activemos escrituras sobre Google Sheets."
-              className="h-10 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white opacity-55 disabled:cursor-not-allowed"
+      {actionHost && createPortal(
+        <div className="flex flex-wrap items-end justify-end gap-1.5">
+          <label className="flex min-w-[170px] flex-col gap-1 text-[10px] font-semibold text-[var(--muted)]">
+            Estado
+            <select
+              value={groupState}
+              onChange={(event) => setGroupState(event.target.value)}
+              aria-label="Estado del grupo"
+              className="h-9 rounded-xl border border-[var(--line)] bg-white px-2 text-[11px] font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
             >
-              Guardar cantidades ({number(changedQuantities)})
-            </button>
+              <option value="">Mantener estado actual</option>
+              {GESTION_ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
+            </select>
+          </label>
 
-            <button
-              type="button"
-              onClick={() => downloadGestionCsv(filtered)}
-              disabled={filtered.length === 0}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--blue)] bg-white px-4 text-xs font-semibold text-[var(--blue)] transition hover:bg-[var(--navy-soft)] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Download aria-hidden="true" className="size-4" />
-              Descargar registros
-            </button>
-          </div>
-        </div>
-      </section>
+          <button
+            type="button"
+            disabled
+            title="Se habilitará en la etapa 2, cuando activemos escrituras sobre Google Sheets."
+            className="h-9 rounded-xl bg-emerald-600 px-2.5 text-[11px] font-semibold text-white opacity-55 disabled:cursor-not-allowed"
+          >
+            Guardar ({number(changedQuantities)})
+          </button>
 
-      <section className="rounded-[18px] border border-[var(--line)] bg-white p-4" aria-labelledby="gestion-filtros-title">
-        <div className="mb-3 flex items-center gap-2 text-[var(--navy)]">
-          <SlidersHorizontal aria-hidden="true" className="size-4" />
-          <h2 id="gestion-filtros-title" className="text-base font-semibold">Explorar registros</h2>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-          <label className="flex min-w-0 flex-col gap-1.5 text-[11px] font-semibold text-[var(--muted)] lg:col-span-2">
+          <button
+            type="button"
+            onClick={() => downloadGestionCsv(filtered)}
+            disabled={filtered.length === 0}
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-[var(--blue)] bg-white px-2.5 text-[11px] font-semibold text-[var(--blue)] transition hover:bg-[var(--navy-soft)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Download aria-hidden="true" className="size-3.5" />
+            Descargar
+          </button>
+        </div>,
+        actionHost,
+      )}
+
+      <section className="rounded-[18px] border border-[var(--line)] bg-white p-3" aria-label="Filtros de gestión">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto] xl:items-end">
+          <label className="flex min-w-0 flex-col gap-1 text-[11px] font-semibold text-[var(--muted)]">
             Buscar SKU, descripción o marca
             <span className="relative">
-              <Search aria-hidden="true" className="absolute left-3 top-3 size-4 text-[var(--muted)]" />
+              <Search aria-hidden="true" className="absolute left-3 top-2.5 size-4 text-[var(--muted)]" />
               <input
                 type="search"
                 value={filters.texto}
                 onChange={(event) => setFilter("texto", event.target.value)}
                 placeholder="Buscar registros…"
-                className="h-10 w-full rounded-xl border border-[var(--line)] bg-white pl-9 pr-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
+                className="h-9 w-full rounded-xl border border-[var(--line)] bg-white pl-9 pr-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
               />
             </span>
           </label>
@@ -266,10 +262,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
           <Select label="Estado" value={filters.estado} options={gestion.estados} placeholder="Todos" onChange={(v) => setFilter("estado", v)} />
           <Select label="Marca" value={filters.marca} options={brandOptions} placeholder="Todas" onChange={(v) => setFilter("marca", v)} />
           <Select label="Política" value={filters.politica} options={["COMPRAR", "NO COMPRAR"]} placeholder="Todas" onChange={(v) => setFilter("politica", v)} />
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--line)] pt-3">
-          <p className="text-xs text-[var(--muted)]">{number(filtered.length)} de {number(gestion.total)} registros</p>
-          <button type="button" onClick={() => { setFilters(blankFilters); setPage(1); }} disabled={!activeFilters} className="text-xs font-semibold text-[var(--blue)] hover:underline disabled:cursor-default disabled:opacity-40 disabled:no-underline">Limpiar filtros</button>
+          <button type="button" onClick={() => { setFilters(blankFilters); setPage(1); }} disabled={!activeFilters} className="h-9 justify-self-end whitespace-nowrap rounded-xl px-2 text-[11px] font-semibold text-[var(--blue)] hover:bg-[var(--navy-soft)] disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent sm:col-span-2 xl:col-span-1">Limpiar filtros</button>
         </div>
       </section>
 
@@ -369,7 +362,10 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Consulta activa</p>
             <h2 id="gestion-tabla-title" className="mt-0.5 text-base font-semibold tracking-[-0.025em] text-[var(--navy)]">Registros de gestión</h2>
           </div>
-          <span className="rounded-full bg-[var(--soft)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)]">{number(filtered.length)} resultados</span>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="text-[11px] text-[var(--muted)]">Consultado: {gestion.actualizado || "Sin datos"}</span>
+            <span className="rounded-full bg-[var(--soft)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)]">{number(filtered.length)} resultados</span>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1320px] table-fixed border-collapse text-left text-[10px] leading-[1.25]">

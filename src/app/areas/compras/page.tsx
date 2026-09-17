@@ -436,7 +436,11 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               </div>
             </details>
           </nav>
-          {!isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias && <div className="shrink-0 xl:ml-2"><ComprasDashboardActions canExport={!isGestion} /></div>}
+          {isGestion ? (
+            <div id="compras-gestion-actions" role="group" aria-label="Acciones de Gestión" className="flex min-w-0 justify-end xl:ml-2" />
+          ) : isDashboard ? (
+            <div className="shrink-0 xl:ml-2"><ComprasDashboardActions canExport /></div>
+          ) : null}
         </div>
 
         <Suspense key={`${String(vista ?? "dashboard")}:${historialSku}:${requestedBrand}`} fallback={<div role="status" className="mt-5 rounded-[22px] border border-[var(--line)] bg-white px-5 py-6 text-sm text-[var(--muted)]">Cargando vista de Compras…</div>}>
