@@ -207,19 +207,16 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
   return (
     <div className="mt-3 space-y-3">
       {actionHost && createPortal(
-        <div className="flex flex-wrap items-end justify-end gap-1.5">
-          <label className="flex min-w-[170px] flex-col gap-1 text-[10px] font-semibold text-[var(--muted)]">
-            Estado
-            <select
-              value={groupState}
-              onChange={(event) => setGroupState(event.target.value)}
-              aria-label="Estado del grupo"
-              className="h-9 rounded-xl border border-[var(--line)] bg-white px-2 text-[11px] font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
-            >
-              <option value="">Mantener estado actual</option>
-              {GESTION_ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
-            </select>
-          </label>
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <select
+            value={groupState}
+            onChange={(event) => setGroupState(event.target.value)}
+            aria-label="Estado del grupo"
+            className="h-9 w-[130px] rounded-xl border border-[var(--line)] bg-white px-2 text-[11px] font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
+          >
+            <option value="">Estado</option>
+            {GESTION_ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
+          </select>
 
           <button
             type="button"
@@ -266,9 +263,9 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
         </div>
       </section>
 
-      <section className="rounded-[18px] border border-[#c9deea] bg-[#f2f8fc] px-4 py-3" aria-label="Gestión masiva">
-        <div className="grid gap-3 lg:grid-cols-[auto_auto_minmax(220px,1fr)_minmax(260px,1fr)_auto] lg:items-end">
-          <label className="flex h-10 items-center gap-2 text-xs font-medium text-[var(--navy)]">
+      <section className="rounded-[18px] border border-[#c9deea] bg-[#f2f8fc] px-3 py-2" aria-label="Gestión masiva">
+        <div className="grid gap-2 lg:grid-cols-[auto_auto_minmax(220px,1fr)_minmax(260px,1fr)_auto] lg:items-end">
+          <label className="flex h-9 items-center gap-2 text-xs font-medium text-[var(--navy)]">
             <input
               ref={selectVisibleRef}
               type="checkbox"
@@ -279,7 +276,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
             Seleccionar visibles
           </label>
 
-          <div className="flex h-10 items-center text-sm font-semibold text-[var(--navy)]">
+          <div className="flex h-9 items-center text-sm font-semibold text-[var(--navy)]">
             {number(selectedSkus.size)} seleccionados
           </div>
 
@@ -288,7 +285,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
             <select
               value={bulkState}
               onChange={(event) => setBulkState(event.target.value)}
-              className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
+              className="h-9 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15"
             >
               <option value="">Elegir estado…</option>
               {GESTION_ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
@@ -315,17 +312,17 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
                 disabled={!bulkObservationEnabled}
                 onChange={(event) => setBulkObservation(event.target.value)}
                 placeholder="Opcional"
-                className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15 disabled:bg-slate-50 disabled:text-slate-400"
+                className="h-9 min-w-0 flex-1 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-medium text-[var(--navy)] outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15 disabled:bg-slate-50 disabled:text-slate-400"
               />
             </span>
           </label>
 
-          <div className="flex h-10 items-center justify-end gap-2">
+          <div className="flex h-9 items-center justify-end gap-2">
             <button
               type="button"
               onClick={clearSelection}
               disabled={selectedSkus.size === 0}
-              className="h-10 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-semibold text-[var(--navy)] transition hover:bg-[var(--soft)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="h-9 rounded-xl border border-[var(--line)] bg-white px-3 text-xs font-semibold text-[var(--navy)] transition hover:bg-[var(--soft)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               Quitar selección
             </button>
@@ -333,13 +330,12 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
               type="button"
               disabled
               title="Se habilitará en la etapa 2, cuando activemos escrituras sobre Google Sheets."
-              className="h-10 rounded-xl bg-purple-600 px-4 text-xs font-semibold text-white opacity-55 disabled:cursor-not-allowed"
+              className="h-9 rounded-xl bg-purple-600 px-4 text-xs font-semibold text-white opacity-55 disabled:cursor-not-allowed"
             >
               Aplicar
             </button>
           </div>
         </div>
-        <p className="mt-2 text-[10px] text-[var(--muted)]">La selección, los filtros y la edición local funcionan. Guardar cantidades y aplicar cambios masivos se habilitarán en la etapa 2.</p>
       </section>
 
       <section className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4" aria-label="Resumen de registros filtrados">
@@ -349,24 +345,14 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
           { label: "Con decisión", value: summary.conDecision },
           { label: "Compra sugerida", value: summary.compraSugerida },
         ].map((item) => (
-          <article key={item.label} className="rounded-[18px] border border-[var(--line)] bg-white px-4 py-3">
+          <article key={item.label} className="rounded-[18px] border border-[var(--line)] bg-white px-4 py-2">
             <p className="text-[11px] font-bold uppercase tracking-[0.13em] text-[var(--muted)]">{item.label}</p>
-            <p className="mt-1 text-2xl font-semibold tracking-[-0.04em] tabular-nums text-[var(--navy)]">{number(item.value)}</p>
+            <p className="mt-0.5 text-2xl font-semibold tracking-[-0.04em] tabular-nums text-[var(--navy)]">{number(item.value)}</p>
           </article>
         ))}
       </section>
 
-      <section className="overflow-hidden rounded-[18px] border border-[var(--line)] bg-white" aria-labelledby="gestion-tabla-title">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] px-4 py-3">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--blue)]">Consulta activa</p>
-            <h2 id="gestion-tabla-title" className="mt-0.5 text-base font-semibold tracking-[-0.025em] text-[var(--navy)]">Registros de gestión</h2>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="text-[11px] text-[var(--muted)]">Consultado: {gestion.actualizado || "Sin datos"}</span>
-            <span className="rounded-full bg-[var(--soft)] px-3 py-1.5 text-xs font-semibold text-[var(--muted)]">{number(filtered.length)} resultados</span>
-          </div>
-        </div>
+      <section className="overflow-hidden rounded-[18px] border border-[var(--line)] bg-white" aria-label="Registros de gestión">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1320px] table-fixed border-collapse text-left text-[10px] leading-[1.25]">
             <colgroup>
