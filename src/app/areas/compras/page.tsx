@@ -299,6 +299,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const isSeguimiento = vista === "seguimiento";
   const isRecepciones = vista === "recepciones";
   const isTransferencias = vista === "transferencias";
+  const isDashboard = !isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias;
   const isWide = isGestion || isCotizaciones || isBandeja || isProceso || isPacking || isContenedores || isSeguimiento || isRecepciones || isTransferencias;
   const historialSku = typeof params.sku === "string" ? params.sku.trim().slice(0, 100) : "";
   const requestedBrand = isGestion && typeof params.marca === "string" ? params.marca.trim().slice(0, 120) : "";
@@ -319,15 +320,16 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
             <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <Link
               href="/areas/compras"
-              prefetch={false}
-              aria-current={!isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias ? "page" : undefined}
-              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${!isGestion && !isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
+              prefetch={isGestion}
+              aria-current={isDashboard ? "page" : undefined}
+              className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isDashboard ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
               Dashboard
             </Link>
 
             <Link
               href="/areas/compras?vista=gestion"
+              prefetch={isDashboard}
               aria-current={isGestion ? "page" : undefined}
               className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isGestion ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
