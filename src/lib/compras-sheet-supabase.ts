@@ -34,16 +34,26 @@ export async function readComprasMirroredSheets<K extends string>(
     if (!importInfo) return;
     const rows: SheetRows = [];
     const pageSize = 1_000;
-    for (let first = 0; first < importInfo.row_count; first += pageSize) {
-      const { data: page, error: pageError } = await db.from("compras_sheet_import_rows")
-        .select("row_index,row_values").eq("import_id", importInfo.import_id)
-        .order("row_index").range(first, first + pageSize - 1);
-      if (pageError) throw new Error(`No se pudo leer ${names[key]} desde Supabase: ${pageError.message}`);
-      for (const entry of page ?? []) {
-        if (entry.row_index !== rows.length || !Array.isArray(entry.row_values)) {
-          throw new Error(`Snapshot incompleto o desordenado de ${names[key]}.`);
+    const pageConcurrency = 4;
+    for (let first = 0; first < importInfo.row_count; first += pageSize * pageConcurrency) {
+      const starts = Array.from(
+        { length: Math.min(pageConcurrency, Math.ceil((importInfo.row_count - first) / pageSize)) },
+        (_, index) => first + index * pageSize,
+      );
+      const pages = await Promise.all(starts.map(async (start) => {
+        const { data, error: pageError } = await db.from("compras_sheet_import_rows")
+          .select("row_index,row_values").eq("import_id", importInfo.import_id)
+          .order("row_index").range(start, start + pageSize - 1);
+        if (pageError) throw new Error(`No se pudo leer ${names[key]} desde Supabase: ${pageError.message}`);
+        return data ?? [];
+      }));
+      for (const page of pages) {
+        for (const entry of page) {
+          if (entry.row_index !== rows.length || !Array.isArray(entry.row_values)) {
+            throw new Error(`Snapshot incompleto o desordenado de ${names[key]}.`);
+          }
+          rows.push(entry.row_values as SheetValue[]);
         }
-        rows.push(entry.row_values as SheetValue[]);
       }
     }
     if (rows.length !== importInfo.row_count) throw new Error(`Snapshot incompleto de ${names[key]}.`);

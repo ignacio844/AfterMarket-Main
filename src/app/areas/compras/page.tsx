@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowDownRight, Boxes, PackageCheck, ShoppingCart, TrendingUp } from "lucide-react";
 import { auth } from "@/auth";
@@ -226,11 +226,9 @@ function DashboardContent({ dashboard }: { dashboard: ComprasDashboard }) {
   );
 }
 
-export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ vista?: string | string[]; sku?: string | string[]; marca?: string | string[] }> }) {
-  const session = await auth();
-  if (!session?.user?.email || !isPortalUserAllowed(session.user.email)) return null;
-  const params = await searchParams;
-  const vista = params.vista;
+type ComprasParams = { vista?: string | string[]; sku?: string | string[]; marca?: string | string[] };
+
+async function ComprasViewContent({ vista, historialSku, requestedBrand }: { vista?: string | string[]; historialSku: string; requestedBrand: string }) {
   const isGestion = vista === "gestion";
   const isHistorial = vista === "historial";
   const isEnvios = vista === "envios";
@@ -242,10 +240,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const isSeguimiento = vista === "seguimiento";
   const isRecepciones = vista === "recepciones";
   const isTransferencias = vista === "transferencias";
-  const isWide = isGestion || isCotizaciones || isBandeja || isProceso || isPacking || isContenedores || isSeguimiento || isRecepciones || isTransferencias;
-  const historialSku = typeof params.sku === "string" ? params.sku.trim().slice(0, 100) : "";
-  const requestedBrand = isGestion && typeof params.marca === "string" ? params.marca.trim().slice(0, 120) : "";
-
   let dashboard: ComprasDashboard | null = null;
   let gestion: ComprasGestion | null = null;
   let historial: ComprasHistorial | null = null;
@@ -278,6 +272,36 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
       ? message
       : `No se pudo cargar ${isHistorial ? "Historial SKU" : isGestion ? "Gestión de Compras" : isBandeja ? "Bandeja de Compra" : isProceso ? "Compras en Proceso" : isPacking ? "Packing List" : isContenedores ? "Contenedores" : isSeguimiento ? "Seguimiento" : isRecepciones ? "Recepciones" : isTransferencias ? "Transferencias" : isEnvios ? "Enviados a Compra" : isCotizaciones ? "Cotizaciones" : "el Dashboard de Compras"}.`;
   }
+  return error && !isHistorial ? (
+    <div role="alert" className="mt-5 flex items-start gap-3 rounded-[22px] border border-red-200 bg-white px-5 py-6 text-red-800">
+      <AlertCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+      <div>
+        <p className="font-semibold">No se pudo cargar {isGestion ? "Gestión de Compras" : isBandeja ? "Bandeja de Compra" : isProceso ? "Compras en Proceso" : isPacking ? "Packing List" : isContenedores ? "Contenedores" : isSeguimiento ? "Seguimiento" : isRecepciones ? "Recepciones" : isTransferencias ? "Transferencias" : isEnvios ? "Enviados a Compra" : isCotizaciones ? "Cotizaciones" : "el Dashboard de Compras"}</p>
+        <p className="mt-1 text-sm">{error}</p>
+      </div>
+    </div>
+  ) : isHistorial ? <ComprasHistorialWorkspace sku={historialSku} historial={historial} error={error} /> : isGestion && gestion ? <ComprasGestionWorkspace key={requestedBrand} gestion={gestion} initialBrand={resolveGestionBrand(gestion.marcas, requestedBrand)} /> : isBandeja && bandeja ? <ComprasBandejaWorkspace data={bandeja} /> : isProceso && proceso ? <ComprasProcesoWorkspace data={proceso} /> : isPacking && packing ? <ComprasPackingWorkspace data={packing} /> : isContenedores && contenedores ? <ComprasContenedoresWorkspace data={contenedores} /> : isSeguimiento && seguimiento ? <ComprasSeguimientoWorkspace data={seguimiento} /> : isRecepciones && recepciones ? <ComprasRecepcionesWorkspace data={recepciones} /> : isTransferencias && transferencias ? <ComprasTransferenciasWorkspace data={transferencias} /> : isEnvios && envios ? <ComprasEnviosWorkspace data={envios} /> : isCotizaciones && cotizaciones ? <ComprasCotizacionesWorkspace data={cotizaciones} /> : dashboard ? <DashboardContent dashboard={dashboard} /> : null;
+}
+
+export default async function ComprasPage({ searchParams }: { searchParams: Promise<ComprasParams> }) {
+  const session = await auth();
+  if (!session?.user?.email || !isPortalUserAllowed(session.user.email)) return null;
+  const params = await searchParams;
+  const vista = params.vista;
+  const isGestion = vista === "gestion";
+  const isHistorial = vista === "historial";
+  const isEnvios = vista === "envios";
+  const isCotizaciones = vista === "cotizaciones";
+  const isBandeja = vista === "bandeja";
+  const isProceso = vista === "proceso";
+  const isPacking = vista === "packing";
+  const isContenedores = vista === "contenedores";
+  const isSeguimiento = vista === "seguimiento";
+  const isRecepciones = vista === "recepciones";
+  const isTransferencias = vista === "transferencias";
+  const isWide = isGestion || isCotizaciones || isBandeja || isProceso || isPacking || isContenedores || isSeguimiento || isRecepciones || isTransferencias;
+  const historialSku = typeof params.sku === "string" ? params.sku.trim().slice(0, 100) : "";
+  const requestedBrand = isGestion && typeof params.marca === "string" ? params.marca.trim().slice(0, 120) : "";
 
   const isMoreView =
     isRecepciones ||
@@ -304,7 +328,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
 
             <Link
               href="/areas/compras?vista=gestion"
-              prefetch={false}
               aria-current={isGestion ? "page" : undefined}
               className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isGestion ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
@@ -313,7 +336,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
 
             <Link
               href="/areas/compras?vista=cotizaciones"
-              prefetch={false}
               aria-current={isCotizaciones ? "page" : undefined}
               className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isCotizaciones ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
@@ -322,7 +344,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
 
             <Link
               href="/areas/compras?vista=bandeja"
-              prefetch={false}
               aria-current={isBandeja ? "page" : undefined}
               className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isBandeja ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
@@ -331,7 +352,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
 
             <Link
               href="/areas/compras?vista=envios"
-              prefetch={false}
               aria-current={isEnvios ? "page" : undefined}
               className={`whitespace-nowrap rounded-xl px-3 py-2.5 text-xs font-semibold transition ${isEnvios ? "bg-[var(--navy)] text-white" : "text-[var(--muted)] hover:bg-[var(--soft)]"}`}
             >
@@ -415,18 +435,12 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               </div>
             </details>
           </nav>
-          {!isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias && <div className="shrink-0 xl:ml-2"><ComprasDashboardActions canExport={Boolean(dashboard) && !isGestion} /></div>}
+          {!isHistorial && !isEnvios && !isCotizaciones && !isBandeja && !isProceso && !isPacking && !isContenedores && !isSeguimiento && !isRecepciones && !isTransferencias && <div className="shrink-0 xl:ml-2"><ComprasDashboardActions canExport={!isGestion} /></div>}
         </div>
 
-        {error && !isHistorial ? (
-          <div role="alert" className="mt-5 flex items-start gap-3 rounded-[22px] border border-red-200 bg-white px-5 py-6 text-red-800">
-            <AlertCircle aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
-            <div>
-              <p className="font-semibold">No se pudo cargar {isGestion ? "Gestión de Compras" : isBandeja ? "Bandeja de Compra" : isProceso ? "Compras en Proceso" : isPacking ? "Packing List" : isContenedores ? "Contenedores" : isSeguimiento ? "Seguimiento" : isRecepciones ? "Recepciones" : isTransferencias ? "Transferencias" : isEnvios ? "Enviados a Compra" : isCotizaciones ? "Cotizaciones" : "el Dashboard de Compras"}</p>
-              <p className="mt-1 text-sm">{error}</p>
-            </div>
-          </div>
-        ) : isHistorial ? <ComprasHistorialWorkspace sku={historialSku} historial={historial} error={error} /> : isGestion && gestion ? <ComprasGestionWorkspace key={requestedBrand} gestion={gestion} initialBrand={resolveGestionBrand(gestion.marcas, requestedBrand)} /> : isBandeja && bandeja ? <ComprasBandejaWorkspace data={bandeja} /> : isProceso && proceso ? <ComprasProcesoWorkspace data={proceso} /> : isPacking && packing ? <ComprasPackingWorkspace data={packing} /> : isContenedores && contenedores ? <ComprasContenedoresWorkspace data={contenedores} /> : isSeguimiento && seguimiento ? <ComprasSeguimientoWorkspace data={seguimiento} /> : isRecepciones && recepciones ? <ComprasRecepcionesWorkspace data={recepciones} /> : isTransferencias && transferencias ? <ComprasTransferenciasWorkspace data={transferencias} /> : isEnvios && envios ? <ComprasEnviosWorkspace data={envios} /> : isCotizaciones && cotizaciones ? <ComprasCotizacionesWorkspace data={cotizaciones} /> : dashboard ? <DashboardContent dashboard={dashboard} /> : null}
+        <Suspense key={`${String(vista ?? "dashboard")}:${historialSku}:${requestedBrand}`} fallback={<div role="status" className="mt-5 rounded-[22px] border border-[var(--line)] bg-white px-5 py-6 text-sm text-[var(--muted)]">Cargando vista de Compras…</div>}>
+          <ComprasViewContent vista={vista} historialSku={historialSku} requestedBrand={requestedBrand} />
+        </Suspense>
       </main>
     </div>
   );
