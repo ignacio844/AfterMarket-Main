@@ -19,6 +19,8 @@
     "bridge:compras-sheets:once": "node --env-file=.env.local bridge/compras-sheets-sync.mjs --once",
     "bridge:compras-sheets:dry-run": "node --env-file=.env.local bridge/compras-sheets-sync.mjs --dry-run",
     "bridge:compras-pending:report": "node --env-file=.env.local bridge/compras-pending-report.mjs",
+    "bridge:compras-gestion:audit": "node --env-file=.env.local bridge/compras-gestion-audit.mjs",
+    "bridge:compras-gestion:import": "node --env-file=.env.local bridge/compras-gestion-import.mjs",
     "bridge:supervise": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-executive-bridge.ps1",
     "bridge:install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/register-executive-bridge-task.ps1"
   },

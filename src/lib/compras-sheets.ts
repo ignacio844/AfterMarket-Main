@@ -5,7 +5,8 @@ import { unstable_cache } from "next/cache";
 import { auth } from "@/auth";
 import { isPortalUserAllowed } from "@/lib/portal-auth";
 import { calculateComprasDashboard, type ComprasDashboard, type SheetRows } from "@/lib/compras-dashboard";
-import { calculateComprasGestion, type ComprasGestion } from "@/lib/compras-gestion";
+import { calculateComprasGestion, overlayGestionDecisions, overlayGestionSheetRows, type ComprasGestion } from "@/lib/compras-gestion";
+import { getGestionDecisions } from "@/lib/compras-gestion-supabase";
 import { calculateComprasHistorial, type ComprasHistorial } from "@/lib/compras-historial";
 import { calculateComprasEnvios, type ComprasEnvios } from "@/lib/compras-envios";
 import { calculateComprasCotizaciones, type ComprasCotizaciones } from "@/lib/compras-cotizaciones";
@@ -221,12 +222,27 @@ function readDashboardSheets<const K extends SheetKey>(keys: readonly K[], requi
     : readComprasMirroredSheets(SHEET_NAMES, keys, required);
 }
 
+async function withCurrentGestion<K extends Partial<Record<"gestion" | "gestionHistorial", SheetRows>>>(sheets: K): Promise<K> {
+  if (process.env.COMPRAS_GESTION_SOURCE !== "SUPABASE") return sheets;
+  const decisions = await getGestionDecisions();
+  return {
+    ...sheets,
+    ...(sheets.gestion ? { gestion: overlayGestionSheetRows(sheets.gestion, decisions) } : {}),
+    ...(sheets.gestionHistorial ? { gestionHistorial: overlayGestionSheetRows(sheets.gestionHistorial, decisions) } : {}),
+  };
+}
+
 export async function getComprasGestion(): Promise<ComprasGestion> {
   const session = await auth();
   const email = session?.user?.email;
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
-  const { sheets, timeZone } = await readCachedSheets(["gestion", "config", "alias"], "gestion");
-  return calculateComprasGestion(sheets, new Date(), timeZone);
+  const sourceIsSupabase = process.env.COMPRAS_GESTION_SOURCE === "SUPABASE";
+  const [source, decisions] = await Promise.all([
+    readCachedSheets(["gestion", "config", "alias"], "gestion"),
+    sourceIsSupabase ? getGestionDecisions() : Promise.resolve(null),
+  ]);
+  const base = calculateComprasGestion(source.sheets, new Date(), source.timeZone);
+  return decisions ? overlayGestionDecisions(base, decisions) : base;
 }
 
 export async function getComprasHistorial(sku: string): Promise<ComprasHistorial> {
@@ -238,7 +254,8 @@ export async function getComprasHistorial(sku: string): Promise<ComprasHistorial
     ["gestion", "config", "alias", "gestionHistorial", "enviosCompra", "procesoCompra", "movimientosCompra"],
     null,
   );
-  return calculateComprasHistorial({ gestionActiva: sheets.gestion, ...sheets }, sku, timeZone);
+  const currentSheets = await withCurrentGestion(sheets);
+  return calculateComprasHistorial({ gestionActiva: currentSheets.gestion, ...currentSheets }, sku, timeZone);
 }
 
 export async function getComprasEnvios(): Promise<ComprasEnvios> {
@@ -257,7 +274,7 @@ export async function getComprasCotizaciones(): Promise<ComprasCotizaciones> {
     ["gestion", "cotizaciones", "ofertas", "config", "alias"],
     "gestion",
   );
-  return calculateComprasCotizaciones(sheets, timeZone);
+  return calculateComprasCotizaciones(await withCurrentGestion(sheets), timeZone);
 }
 
 export async function getComprasBandeja(): Promise<ComprasBandeja> {
@@ -265,7 +282,7 @@ export async function getComprasBandeja(): Promise<ComprasBandeja> {
   const email = session?.user?.email;
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
   const { sheets, timeZone } = await readCachedSheets(["gestion", "cotizaciones", "ofertas"], "gestion");
-  return calculateComprasBandeja(sheets, timeZone);
+  return calculateComprasBandeja(await withCurrentGestion(sheets), timeZone);
 }
 
 export async function getComprasProceso(): Promise<ComprasProceso> {
@@ -318,5 +335,5 @@ export async function getComprasTransferencias(): Promise<ComprasTransferencias>
   const email = session?.user?.email;
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
   const { sheets } = await readCachedSheets(["gestion"], "gestion");
-  return calculateComprasTransferencias(sheets, new Date());
+  return calculateComprasTransferencias(await withCurrentGestion(sheets), new Date());
 }

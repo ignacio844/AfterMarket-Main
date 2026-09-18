@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 import { JWT } from "google-auth-library";
 import { createClient } from "@supabase/supabase-js";
+import { auditGestionSheets, hasBlockingGestionIssues } from "./compras-gestion-audit.mjs";
 
 const SHEETS = Object.freeze({
   MODELO_COMPRAS: 25_000,
@@ -16,6 +17,8 @@ const SHEETS = Object.freeze({
   ORDENES: 1,
   PARAMETROS_COMPRAS: 1,
   MARCAS: 1,
+  GESTION_COMPRAS: 3_000,
+  GESTION_COMPRAS_ACTIVA: 3_000,
 });
 const PAGE_ROWS = 5_000;
 const INSERT_ROWS = 300;
@@ -179,9 +182,19 @@ async function sync({ dryRun = false } = {}) {
   try {
     const source = await googleSource();
     const db = dryRun ? null : dbClient();
+    const managementDatasets = {
+      GESTION_COMPRAS: await readSheet(source, "GESTION_COMPRAS"),
+      GESTION_COMPRAS_ACTIVA: await readSheet(source, "GESTION_COMPRAS_ACTIVA"),
+    };
+    const managementAudit = auditGestionSheets(Object.fromEntries(
+      Object.entries(managementDatasets).map(([name, dataset]) => [name, dataset.rows]),
+    ));
+    if (hasBlockingGestionIssues(managementAudit)) {
+      throw new Error(`Las hojas de Gestión no superaron la validación: ${JSON.stringify(managementAudit.sheets)}`);
+    }
     const results = [];
     for (const sheetName of Object.keys(SHEETS)) {
-      const dataset = await readSheet(source, sheetName);
+      const dataset = managementDatasets[sheetName] ?? await readSheet(source, sheetName);
       results.push(dryRun
         ? { sheet: sheetName, rows: dataset.rows.length, dryRun: true }
         : { sheet: sheetName, ...await publishSheet(db, source, sheetName, dataset) });
@@ -189,7 +202,7 @@ async function sync({ dryRun = false } = {}) {
     const batchId = dryRun ? null : await publishBatch(db, source, results);
     lastRunAt = new Date().toISOString();
     lastError = null;
-    console.log(JSON.stringify({ source: "Google Sheets readonly", batchId, results }));
+    console.log(JSON.stringify({ source: "Google Sheets readonly", batchId, results, gestion: managementAudit.reconciliation }));
   } catch (cause) {
     lastError = String(cause?.message ?? cause);
     console.error("Compras Sheet mirror:", lastError);

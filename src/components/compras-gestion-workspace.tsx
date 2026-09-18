@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Download, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -24,6 +25,10 @@ const getServerActionHost = () => null;
 
 function number(value: number) {
   return whole.format(Math.round(value || 0));
+}
+
+function registroUnavailable(registro: GestionRegistro) {
+  return registro.version < 1;
 }
 
 function csvCell(value: string | number | boolean) {
@@ -107,7 +112,8 @@ function Risk({ value }: { value: string }) {
   return <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold whitespace-nowrap ${tone}`}>{value || "—"}</span>;
 }
 
-export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestion: ComprasGestion; initialBrand?: string }) {
+export function ComprasGestionWorkspace({ gestion, initialBrand = "", canEdit = false }: { gestion: ComprasGestion; initialBrand?: string; canEdit?: boolean }) {
+  const router = useRouter();
   const [filters, setFilters] = useState<GestionFilters>(() => ({ ...blankFilters, marca: initialBrand }));
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<GestionRegistro | null>(null);
@@ -118,6 +124,9 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
   const [bulkObservation, setBulkObservation] = useState("");
   const [groupState, setGroupState] = useState("");
   const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
   const actionHost = useSyncExternalStore(subscribeActionHost, getActionHost, getServerActionHost);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const selectVisibleRef = useRef<HTMLInputElement>(null);
@@ -204,6 +213,57 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
 
   const changedQuantities = Object.keys(quantityDrafts).length;
 
+  const saveChanges = async (changes: Array<{ sku: string; estadoGestion: string; cantidadDecidida: number; observacion: string; version: number }>, afterSave: () => void) => {
+    if (!canEdit || saving) return;
+    setSaveError("");
+    setSaveMessage("");
+    if (changes.some((change) => !GESTION_ESTADOS.includes(change.estadoGestion) || !Number.isSafeInteger(change.cantidadDecidida) || change.cantidadDecidida < 0 || change.version < 1)) {
+      setSaveError("Revisá estado y cantidades. Un SKU sin resolver necesita una decisión explícita.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch("/api/compras/gestion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ changes }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "No se pudo guardar Gestión.");
+      afterSave();
+      setSaveMessage(`${number(result.saved)} SKU guardados en Supabase.`);
+      router.refresh();
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : "No se pudo guardar Gestión.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const quantityFromText = (value: string) => value.trim() === "" ? 0 : Number(value);
+
+  const saveQuantities = () => {
+    const records = gestion.registros.filter((registro) => Object.prototype.hasOwnProperty.call(quantityDrafts, registro.sku));
+    void saveChanges(records.map((registro) => ({
+      sku: registro.sku,
+      estadoGestion: groupState || registro.estadoGestion,
+      cantidadDecidida: quantityFromText(quantityDrafts[registro.sku]),
+      observacion: registro.observacion,
+      version: registro.version,
+    })), () => { setQuantityDrafts({}); setGroupState(""); });
+  };
+
+  const applyBulk = () => {
+    const records = gestion.registros.filter((registro) => selectedSkus.has(registro.sku));
+    void saveChanges(records.map((registro) => ({
+      sku: registro.sku,
+      estadoGestion: bulkState,
+      cantidadDecidida: registro.cantidadDecidida,
+      observacion: bulkObservationEnabled ? bulkObservation.trim() : registro.observacion,
+      version: registro.version,
+    })), () => { clearSelection(); setBulkState(""); setBulkObservation(""); setBulkObservationEnabled(false); });
+  };
+
   return (
     <div className="mt-3 space-y-3">
       {actionHost && createPortal(
@@ -220,9 +280,10 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
 
           <button
             type="button"
-            disabled
-            title="Se habilitará en la etapa 2, cuando activemos escrituras sobre Google Sheets."
-            className="h-9 rounded-xl bg-emerald-600 px-2.5 text-[11px] font-semibold text-white opacity-55 disabled:cursor-not-allowed"
+            onClick={saveQuantities}
+            disabled={!canEdit || saving || changedQuantities === 0}
+            title={!canEdit ? "Guardado disponible tras activar la migración a Supabase para editores." : undefined}
+            className="h-9 rounded-xl bg-emerald-600 px-2.5 text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55"
           >
             Guardar ({number(changedQuantities)})
           </button>
@@ -239,6 +300,8 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
         </div>,
         actionHost,
       )}
+
+      {(saveError || saveMessage) && <p role={saveError ? "alert" : "status"} className={`rounded-xl px-3 py-2 text-xs ${saveError ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>{saveError || saveMessage}</p>}
 
       <section className="rounded-[18px] border border-[var(--line)] bg-white p-3" aria-label="Filtros de gestión">
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto] xl:items-end">
@@ -328,9 +391,10 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
             </button>
             <button
               type="button"
-              disabled
-              title="Se habilitará en la etapa 2, cuando activemos escrituras sobre Google Sheets."
-              className="h-9 rounded-xl bg-purple-600 px-4 text-xs font-semibold text-white opacity-55 disabled:cursor-not-allowed"
+              onClick={applyBulk}
+              disabled={!canEdit || saving || selectedSkus.size === 0 || !bulkState}
+              title={!canEdit ? "Guardado disponible tras activar la migración a Supabase para editores." : undefined}
+              className="h-9 rounded-xl bg-purple-600 px-4 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55"
             >
               Aplicar
             </button>
@@ -411,7 +475,8 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
                         value={quantityValue}
                         onChange={(event) => updateQuantityDraft(r, event.target.value)}
                         aria-label={`Cantidad decidida para ${r.sku}`}
-                        className={`h-8 w-full min-w-[72px] rounded-lg border px-2 text-right text-[10px] font-medium tabular-nums outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15 ${quantityChanged ? "border-amber-400 bg-amber-50" : "border-[var(--line)] bg-white"}`}
+                        disabled={!canEdit || registroUnavailable(r)}
+                        className={`h-8 w-full min-w-[72px] rounded-lg border px-2 text-right text-[10px] font-medium tabular-nums outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15 disabled:cursor-not-allowed disabled:opacity-60 ${quantityChanged ? "border-amber-400 bg-amber-50" : "border-[var(--line)] bg-white"}`}
                       />
                     </td>
                     <td className="break-words px-1.5 py-2">{r.responsable || "—"}</td>
@@ -453,7 +518,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
           <div className="flex h-full flex-col">
             <div className="flex items-start justify-between gap-4 border-b border-[var(--line)] px-5 py-4 sm:px-6">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--blue)]">Borrador local · sin guardar</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--blue)]">{canEdit ? "Decisión en Supabase" : "Consulta de solo lectura"}</p>
                 <h2 id="gestion-panel-title" className="mt-1 text-xl font-semibold tracking-[-0.03em] text-[var(--navy)]">Gestionar SKU</h2>
               </div>
               <button type="button" onClick={closeGestion} aria-label="Cerrar panel de gestión" className="rounded-lg p-2 text-[var(--muted)] transition hover:bg-[var(--soft)] hover:text-[var(--navy)]"><X aria-hidden="true" className="size-5" /></button>
@@ -481,7 +546,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
                 <input id="gestion-cantidad" type="number" min="0" step="1" value={draft.cantidadDecidida} onChange={(event) => setDraft((current) => ({ ...current, cantidadDecidida: event.target.value }))} placeholder="Sin cantidad" className="-mt-2 h-11 w-full rounded-xl border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15" />
 
                 <label htmlFor="gestion-observacion" className="block text-xs font-semibold text-[var(--navy)]">Observación</label>
-                <textarea id="gestion-observacion" maxLength={1000} rows={5} value={draft.observacion} onChange={(event) => setDraft((current) => ({ ...current, observacion: event.target.value }))} placeholder="Agregá una nota para probar el formulario" className="-mt-2 w-full resize-y rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15" />
+                <textarea id="gestion-observacion" maxLength={1000} rows={5} value={draft.observacion} onChange={(event) => setDraft((current) => ({ ...current, observacion: event.target.value }))} placeholder="Agregá una observación" className="-mt-2 w-full resize-y rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15" />
                 <p className="text-right text-[11px] text-[var(--muted)]">{draft.observacion.length} / 1000 caracteres</p>
               </div>
 
@@ -491,10 +556,17 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "" }: { gestio
             </div>
 
             <div className="border-t border-[var(--line)] bg-white px-5 py-4 sm:px-6">
-              <p className="mb-3 text-xs text-[var(--muted)]">Este es un prototipo. Los cambios se descartan al cerrar y no llegan a Google Sheets.</p>
+              {saveError && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-800">{saveError}</p>}
+              <p className="mb-3 text-xs text-[var(--muted)]">{selected.requiereRevision ? "Este SKU tiene una discrepancia histórica: elegí un estado explícito antes de guardar." : canEdit ? "La decisión se guardará en Supabase; Google Sheets no se modificará." : "La edición se habilitará cuando termine la migración de Gestión."}</p>
               <div className="flex justify-end gap-2">
                 <button type="button" onClick={closeGestion} className="rounded-xl border border-[var(--line)] px-4 py-2.5 text-xs font-semibold text-[var(--navy)] transition hover:bg-[var(--soft)]">Cerrar sin guardar</button>
-                <button type="button" disabled title="La persistencia se implementará en la etapa 2." className="rounded-xl bg-[var(--navy)] px-4 py-2.5 text-xs font-semibold text-white opacity-50 disabled:cursor-not-allowed">Guardar</button>
+                <button type="button" onClick={() => void saveChanges([{
+                  sku: selected.sku,
+                  estadoGestion: draft.estadoGestion,
+                  cantidadDecidida: quantityFromText(draft.cantidadDecidida),
+                  observacion: draft.observacion.trim(),
+                  version: selected.version,
+                }], closeGestion)} disabled={!canEdit || saving || selected.version < 1 || !GESTION_ESTADOS.includes(draft.estadoGestion)} className="rounded-xl bg-[var(--navy)] px-4 py-2.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? "Guardando…" : "Guardar"}</button>
               </div>
             </div>
           </div>

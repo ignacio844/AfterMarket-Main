@@ -18,7 +18,7 @@ import { ComprasContenedoresWorkspace } from "@/components/compras-contenedores-
 import { ComprasSeguimientoWorkspace } from "@/components/compras-seguimiento-workspace";
 import { ComprasRecepcionesWorkspace } from "@/components/compras-recepciones-workspace";
 import { ComprasTransferenciasWorkspace } from "@/components/compras-transferencias-workspace";
-import { isPortalUserAllowed } from "@/lib/portal-auth";
+import { isPortalEditor, isPortalUserAllowed } from "@/lib/portal-auth";
 import { getComprasDashboard, getComprasGestion, getComprasHistorial, getComprasEnvios, getComprasCotizaciones, getComprasBandeja, getComprasProceso, getComprasPacking, getComprasContenedores, getComprasSeguimiento, getComprasRecepciones, getComprasTransferencias } from "@/lib/compras-sheets";
 import type { ComprasDashboard, DashboardBrand, DashboardSource } from "@/lib/compras-dashboard";
 import { resolveGestionBrand, type ComprasGestion } from "@/lib/compras-gestion";
@@ -228,7 +228,7 @@ function DashboardContent({ dashboard }: { dashboard: ComprasDashboard }) {
 
 type ComprasParams = { vista?: string | string[]; sku?: string | string[]; marca?: string | string[] };
 
-async function ComprasViewContent({ vista, historialSku, requestedBrand }: { vista?: string | string[]; historialSku: string; requestedBrand: string }) {
+async function ComprasViewContent({ vista, historialSku, requestedBrand, canEditGestion }: { vista?: string | string[]; historialSku: string; requestedBrand: string; canEditGestion: boolean }) {
   const isGestion = vista === "gestion";
   const isHistorial = vista === "historial";
   const isEnvios = vista === "envios";
@@ -280,7 +280,7 @@ async function ComprasViewContent({ vista, historialSku, requestedBrand }: { vis
         <p className="mt-1 text-sm">{error}</p>
       </div>
     </div>
-  ) : isHistorial ? <ComprasHistorialWorkspace sku={historialSku} historial={historial} error={error} /> : isGestion && gestion ? <ComprasGestionWorkspace key={requestedBrand} gestion={gestion} initialBrand={resolveGestionBrand(gestion.marcas, requestedBrand)} /> : isBandeja && bandeja ? <ComprasBandejaWorkspace data={bandeja} /> : isProceso && proceso ? <ComprasProcesoWorkspace data={proceso} /> : isPacking && packing ? <ComprasPackingWorkspace data={packing} /> : isContenedores && contenedores ? <ComprasContenedoresWorkspace data={contenedores} /> : isSeguimiento && seguimiento ? <ComprasSeguimientoWorkspace data={seguimiento} /> : isRecepciones && recepciones ? <ComprasRecepcionesWorkspace data={recepciones} /> : isTransferencias && transferencias ? <ComprasTransferenciasWorkspace data={transferencias} /> : isEnvios && envios ? <ComprasEnviosWorkspace data={envios} /> : isCotizaciones && cotizaciones ? <ComprasCotizacionesWorkspace data={cotizaciones} /> : dashboard ? <DashboardContent dashboard={dashboard} /> : null;
+  ) : isHistorial ? <ComprasHistorialWorkspace sku={historialSku} historial={historial} error={error} /> : isGestion && gestion ? <ComprasGestionWorkspace key={requestedBrand} gestion={gestion} canEdit={canEditGestion} initialBrand={resolveGestionBrand(gestion.marcas, requestedBrand)} /> : isBandeja && bandeja ? <ComprasBandejaWorkspace data={bandeja} /> : isProceso && proceso ? <ComprasProcesoWorkspace data={proceso} /> : isPacking && packing ? <ComprasPackingWorkspace data={packing} /> : isContenedores && contenedores ? <ComprasContenedoresWorkspace data={contenedores} /> : isSeguimiento && seguimiento ? <ComprasSeguimientoWorkspace data={seguimiento} /> : isRecepciones && recepciones ? <ComprasRecepcionesWorkspace data={recepciones} /> : isTransferencias && transferencias ? <ComprasTransferenciasWorkspace data={transferencias} /> : isEnvios && envios ? <ComprasEnviosWorkspace data={envios} /> : isCotizaciones && cotizaciones ? <ComprasCotizacionesWorkspace data={cotizaciones} /> : dashboard ? <DashboardContent dashboard={dashboard} /> : null;
 }
 
 export default async function ComprasPage({ searchParams }: { searchParams: Promise<ComprasParams> }) {
@@ -444,7 +444,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         </div>
 
         <Suspense key={`${String(vista ?? "dashboard")}:${historialSku}:${requestedBrand}`} fallback={<div role="status" className="mt-5 rounded-[22px] border border-[var(--line)] bg-white px-5 py-6 text-sm text-[var(--muted)]">Cargando vista de Compras…</div>}>
-          <ComprasViewContent vista={vista} historialSku={historialSku} requestedBrand={requestedBrand} />
+          <ComprasViewContent vista={vista} historialSku={historialSku} requestedBrand={requestedBrand} canEditGestion={process.env.COMPRAS_GESTION_SOURCE === "SUPABASE" && isPortalEditor(session.user.email)} />
         </Suspense>
       </main>
     </div>

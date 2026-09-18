@@ -14,7 +14,7 @@ registerHooks({
   },
 });
 
-const { calculateComprasGestion, filterGestion, resolveGestionBrand, summarizeGestion } = await import("../src/lib/compras-gestion.ts");
+const { calculateComprasGestion, filterGestion, normalizeGestionChanges, overlayGestionDecisions, overlayGestionSheetRows, resolveGestionBrand, summarizeGestion } = await import("../src/lib/compras-gestion.ts");
 const now = new Date("2026-09-14T15:00:00.000Z");
 
 function sheets(overrides = {}) {
@@ -77,4 +77,37 @@ test("handles empty Gestion and rejects missing required columns", () => {
   assert.equal(empty.total, 0);
   assert.deepEqual(empty.registros, []);
   assert.throws(() => calculateComprasGestion(sheets({ gestion: [["SKU"], ["A"]] }), now), /columnas requeridas/);
+});
+
+test("Supabase decisions replace stale Sheet decisions without changing plan metrics", () => {
+  const base = calculateComprasGestion(sheets(), now);
+  const decisions = [{
+    sku: "B", estado_gestion: "NO COMPRAR", cantidad_decidida: 9,
+    responsable: "editor@grupo-aftermarket.com", observacion: "Decisión nueva",
+    fecha_decision: "2026-09-17T14:00:00.000Z", requiere_revision: false, version: 2,
+  }];
+  const updated = overlayGestionDecisions(base, decisions);
+  assert.equal(updated.registros[1].estadoGestion, "NO COMPRAR");
+  assert.equal(updated.registros[1].cantidadDecidida, 9);
+  assert.equal(updated.registros[1].compraSugerida, base.registros[1].compraSugerida);
+  assert.equal(updated.registros[1].version, 2);
+  const rows = overlayGestionSheetRows(sheets().gestion, decisions);
+  assert.equal(rows[2][6], "NO COMPRAR");
+  assert.equal(rows[2][7], 9);
+  assert.equal(sheets().gestion[2][6], "APROBADO");
+});
+
+test("flags unresolved conflict and rejects invalid or duplicate writes", () => {
+  const base = calculateComprasGestion(sheets(), now);
+  const updated = overlayGestionDecisions(base, [{
+    sku: "B", estado_gestion: null, cantidad_decidida: 4, responsable: "", observacion: "",
+    fecha_decision: null, requiere_revision: true, version: 1,
+  }]);
+  assert.equal(updated.registros[1].estadoGestion, "SIN RESOLVER");
+  assert.equal(updated.registros[1].requiereRevision, true);
+  const valid = { sku: " b ", estadoGestion: "APROBADO", cantidadDecidida: 5, observacion: "Ok", version: 1 };
+  assert.equal(normalizeGestionChanges([valid])[0].sku, "B");
+  assert.throws(() => normalizeGestionChanges([valid, valid]), /duplicados|inválido/);
+  assert.throws(() => normalizeGestionChanges([{ ...valid, cantidadDecidida: -1 }]), /inválido/);
+  assert.throws(() => normalizeGestionChanges([{ ...valid, estadoGestion: "SIN RESOLVER" }]), /inválido/);
 });
