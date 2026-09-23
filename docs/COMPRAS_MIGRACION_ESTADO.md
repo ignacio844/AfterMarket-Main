@@ -1,6 +1,6 @@
 # Migración de Compras: contexto y estado
 
-Última actualización: 16/09/2026.
+Última actualización: 18/09/2026.
 
 ## Objetivo y decisiones vigentes
 
@@ -79,21 +79,29 @@ Por decisión del usuario, los parámetros y la configuración permanecen en Goo
 
 El puente de solo lectura ahora incluye `GESTION_COMPRAS` y `GESTION_COMPRAS_ACTIVA`, verifica su estructura y datos antes de publicar el lote y conserva la discrepancia para conciliación. El `dry-run` de 13 pestañas pasó; la ejecución manual publicó el lote validado `#7`, que incluye 3.698 filas (encabezado incluido) por cada hoja de Gestión. Una lectura posterior de Supabase confirmó ambas importaciones en ese lote. El portal sigue leyendo Gestión directamente de Sheets; el espejo todavía no es la fuente autoritativa de decisiones. El proceso residente del puente debe reiniciarse/desplegarse con esta versión antes de depender de la sincronización periódica de esas dos hojas; una ejecución con la versión anterior puede volver a publicar un lote de 11 pestañas.
 
-### Gestión — persistencia Supabase preparada (17/09/2026)
+### Gestión — persistencia Supabase preparada (18/09/2026)
 
-La migración `009_compras_gestion_decisiones.sql` crea decisiones por SKU, eventos y dos funciones transaccionales: importación inicial sin sobrescritura y guardado con versión esperada. RLS y privilegios impiden acceso directo desde el navegador; la API `/api/compras/gestion` comprueba sesión y permiso de editor antes de llamar con la clave privada del servidor. El portal conserva Sheets como entrada de plan/parámetros y superpone las decisiones de Supabase en Gestión, Cotizaciones, Bandeja, Transferencias e Historial cuando `COMPRAS_GESTION_SOURCE=SUPABASE`. El historial del portal muestra la última decisión; la nueva tabla de eventos conserva las revisiones completas para una futura vista de auditoría.
+La migración `009_compras_gestion_decisiones.sql` crea decisiones por SKU, eventos y dos funciones transaccionales: importación inicial sin sobrescritura y guardado con versión esperada. `010_compras_gestion_nuevos.sql` añade una importación incremental que incorpora sólo SKU ausentes y nunca modifica decisiones existentes. RLS y privilegios impiden acceso directo desde el navegador; la API `/api/compras/gestion` comprueba sesión y permiso de editor antes de llamar con la clave privada del servidor. El portal conserva Sheets como entrada de plan/parámetros y superpone las decisiones de Supabase en Gestión, Cotizaciones, Bandeja, Transferencias e Historial cuando `COMPRAS_GESTION_SOURCE=SUPABASE`. El historial muestra la decisión legacy como línea de base y cada nueva decisión de Supabase sin duplicar el evento de migración. El SKU contradictorio queda marcado como no conciliado.
 
-`npm run bridge:compras-gestion:import` es una simulación de solo lectura sobre el lote espejo vigente. La prueba real de este turno leyó el lote `#7`, encontró 3.697 SKU y marcó sólo `KLILED13961GELBL` para revisión. Su estado migrado será nulo; ninguna de las dos versiones de Sheets gana automáticamente. `npm run bridge:compras-gestion:import -- --apply` escribirá la importación inicial **sólo después de aplicar la migración SQL**. La función SQL rechaza un segundo bootstrap sobre decisiones existentes.
+`npm run bridge:compras-gestion:import` es una simulación de solo lectura sobre el lote espejo vigente. La prueba del 17/09 leyó el lote `#7`, encontró 3.697 SKU y marcó sólo `KLILED13961GELBL` para revisión. Su estado migrado será nulo; ninguna de las dos versiones de Sheets gana automáticamente. `npm run bridge:compras-gestion:import -- --apply` escribirá la importación inicial **sólo después de aplicar la migración SQL**. La función SQL rechaza un segundo bootstrap sobre decisiones existentes. Antes de activar el portal, `npm run bridge:compras-gestion:import -- --verify` compara el snapshot vigente contra la importación y sale con error si falta un SKU o la decisión legacy cambió desde el bootstrap. Para SKU posteriores, `npm run bridge:compras-gestion:import -- --sync-new` informa los ausentes y `--sync-new --apply` los incorpora sin sobrescribir estados, cantidades ni versiones ya guardadas. Esta sincronización exige que ambas hojas de Gestión estén íntegras y tengan el mismo conjunto de SKU.
 
 La activación sigue pendiente; no se modificó `.env.local` ni se ejecutó `--apply`. Orden de corte:
 
-1. Deshabilitar la edición de decisiones en el Apps Script legacy para evitar dos escritores; Sheets continúa editable para parámetros.
-2. Aplicar la migración `009` al esquema `portal_aftermarket` y reiniciar el puente con las 13 pestañas.
+1. Acordar un corte que evite dos escritores. El usuario indicó expresamente no cambiar el Apps Script activo; por lo tanto, no cerrar allí las funciones ni activar escritura nueva mientras el legacy siga editando decisiones. Sheets continúa editable para parámetros.
+2. Aplicar las migraciones `009` y `010` al esquema `portal_aftermarket` y reiniciar el puente con las 13 pestañas.
 3. Correr el dry-run, revisar cantidad/conflictos, ejecutar `--apply` y confirmar 3.697 decisiones y un SKU en revisión.
 4. Configurar `COMPRAS_GESTION_SOURCE=SUPABASE`, reiniciar/desplegar portal y probar guardado individual, cantidades y selección masiva con un editor y lectura con un usuario sin edición.
 5. Verificar que los consumidores de decisiones muestran el estado nuevo y que la hoja legacy no recibió ninguna escritura.
 
-Un SKU nuevo que aparezca después del bootstrap se muestra desde el plan pero queda sin versión y no puede guardarse hasta añadir una importación incremental validada. No debe habilitarse el corte si se espera que entren SKU nuevos antes de resolver esa ruta. La vista Historial aún no representa cada evento nuevo de Supabase, aunque la tabla de eventos sí los conserva.
+Un SKU nuevo que aparezca después del bootstrap se muestra desde el plan pero queda sin versión y no puede guardarse hasta correr la importación incremental. Conviene programar ese paso junto a la revisión del espejo y alertar si las dos hojas de Gestión dejan de conciliar.
+
+El 18/09 se identificó el worker residente antiguo que había vuelto a publicar lotes de 11 hojas. Se reinició únicamente ese proceso con el código de 13 hojas; el health check quedó `ok` y publicó el lote `#11` con las dos hojas de Gestión (3.698 filas cada una). El dry-run del importador sobre `#11` confirmó de nuevo 3.697 SKU y sólo el conflicto `KLILED13961GELBL`.
+
+Las migraciones equivalentes a `009` y `010` se aplicaron manualmente desde el editor SQL del proyecto Supabase **Foro Grupo Aftermarket** (`gowqlnnyuhoplbymjlxl`) y se registraron como versiones `009` y `010` en `supabase_migrations.schema_migrations`. Una consulta posterior confirmó ambas tablas con RLS habilitado, las tres funciones presentes y **cero decisiones/eventos**. No se ejecutó la importación, no se activó `COMPRAS_GESTION_SOURCE` y el portal continúa sin escrituras de Gestión. El panel de Supabase mostraba `EXCEEDING USAGE LIMITS` y estado `Unhealthy` por tamaño de base superior a la cuota gratuita; las operaciones SQL indicadas sí terminaron correctamente, pero conviene resolver la cuota antes del corte final.
+
+El usuario luego indicó expresamente **no cambiar nada del Apps Script actual**. Se localizó y leyó el proyecto activo `SISTEMA DE IMPORTACION`, pero no se guardó ni publicó ningún cambio. Se retiraron las guardas que se habían preparado en las copias locales de `portal_compras.gs` y `Sprint_B17D_DesicionCompra.gs`. Las funciones `guardarDecisionCompraPortal`, `guardarGestionMasivaPortal`, `aprobarOfertaCotizacionPortal`, `enviarACompraPortal` y `guardarDecisionCompraB17D` siguen siendo escritores de Sheets. La activación de escrituras en Supabase permanece detenida hasta definir con el usuario una estrategia de corte que no requiera modificar Apps Script y garantice un único escritor.
+
+El worker de 13 hojas quedó activo manualmente y saludable en `127.0.0.1:8793`. La tarea supervisora registrada estaba en estado `Ready` (no corriendo). Su inicio fue rechazado por el control de seguridad porque el script también podría iniciar otros bridges, un gateway y un túnel público; no se reintentó ni se creó un mecanismo alternativo. Por tanto, la persistencia del worker después de reiniciar el equipo **no está garantizada**.
 
 La conciliación alternativa incorpora `EQUIVALENCIAS_SKU` y `ORDENES` para estudiar proveedor+ITEM, SKU directo y otros cruces. La ruta productiva conserva deliberadamente la prioridad de mapeo y los dos estados de B12B, pero aplica la fuente original de Órdenes confirmada por el usuario.
 

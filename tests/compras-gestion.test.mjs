@@ -105,6 +105,7 @@ test("flags unresolved conflict and rejects invalid or duplicate writes", () => 
   }]);
   assert.equal(updated.registros[1].estadoGestion, "SIN RESOLVER");
   assert.equal(updated.registros[1].requiereRevision, true);
+  assert.deepEqual(summarizeGestion(updated.registros), { total: 3, pendientes: 2, conDecision: 1, compraSugerida: 1249 });
   const valid = { sku: " b ", estadoGestion: "APROBADO", cantidadDecidida: 5, observacion: "Ok", version: 1 };
   assert.equal(normalizeGestionChanges([valid])[0].sku, "B");
   assert.throws(() => normalizeGestionChanges([valid, valid]), /duplicados|inválido/);

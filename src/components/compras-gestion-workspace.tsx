@@ -158,6 +158,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "", canEdit = 
   };
 
   const filtered = useMemo(() => filterGestion(gestion.registros, filters), [gestion.registros, filters]);
+  const selectableFiltered = useMemo(() => filtered.filter((registro) => !registroUnavailable(registro)), [filtered]);
   const summary = useMemo(() => summarizeGestion(filtered), [filtered]);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const visiblePage = Math.min(page, pageCount);
@@ -169,15 +170,15 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "", canEdit = 
     : gestion.marcas;
 
   const selectedFilteredCount = useMemo(
-    () => filtered.reduce((total, registro) => total + (selectedSkus.has(registro.sku) ? 1 : 0), 0),
-    [filtered, selectedSkus],
+    () => selectableFiltered.reduce((total, registro) => total + (selectedSkus.has(registro.sku) ? 1 : 0), 0),
+    [selectableFiltered, selectedSkus],
   );
-  const allFilteredSelected = filtered.length > 0 && selectedFilteredCount === filtered.length;
+  const allFilteredSelected = selectableFiltered.length > 0 && selectedFilteredCount === selectableFiltered.length;
 
   useEffect(() => {
     if (!selectVisibleRef.current) return;
-    selectVisibleRef.current.indeterminate = selectedFilteredCount > 0 && selectedFilteredCount < filtered.length;
-  }, [filtered.length, selectedFilteredCount]);
+    selectVisibleRef.current.indeterminate = selectedFilteredCount > 0 && selectedFilteredCount < selectableFiltered.length;
+  }, [selectableFiltered.length, selectedFilteredCount]);
 
   const toggleRegistro = (sku: string, checked: boolean) => {
     setSelectedSkus((current) => {
@@ -191,7 +192,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "", canEdit = 
   const toggleFiltered = (checked: boolean) => {
     setSelectedSkus((current) => {
       const next = new Set(current);
-      filtered.forEach((registro) => {
+      selectableFiltered.forEach((registro) => {
         if (checked) next.add(registro.sku);
         else next.delete(registro.sku);
       });
@@ -244,6 +245,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "", canEdit = 
 
   const saveQuantities = () => {
     const records = gestion.registros.filter((registro) => Object.prototype.hasOwnProperty.call(quantityDrafts, registro.sku));
+    if (records.length > 1 && !window.confirm(`¿Guardar cantidades para ${number(records.length)} SKU${groupState ? ` con estado ${groupState}` : ""}?`)) return;
     void saveChanges(records.map((registro) => ({
       sku: registro.sku,
       estadoGestion: groupState || registro.estadoGestion,
@@ -255,6 +257,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "", canEdit = 
 
   const applyBulk = () => {
     const records = gestion.registros.filter((registro) => selectedSkus.has(registro.sku));
+    if (!window.confirm(`¿Aplicar ${bulkState} a ${number(records.length)} SKU seleccionados?`)) return;
     void saveChanges(records.map((registro) => ({
       sku: registro.sku,
       estadoGestion: bulkState,
@@ -334,6 +337,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "", canEdit = 
               type="checkbox"
               checked={allFilteredSelected}
               onChange={(event) => toggleFiltered(event.target.checked)}
+              disabled={!canEdit || selectableFiltered.length === 0}
               className="size-4 rounded border-[var(--line)] accent-[var(--navy)]"
             />
             Seleccionar visibles
@@ -453,6 +457,7 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "", canEdit = 
                         type="checkbox"
                         checked={selectedSkus.has(r.sku)}
                         onChange={(event) => toggleRegistro(r.sku, event.target.checked)}
+                        disabled={!canEdit || registroUnavailable(r)}
                         aria-label={`Seleccionar ${r.sku}`}
                         className="size-4 rounded border-[var(--line)] accent-[var(--navy)]"
                       />
@@ -538,15 +543,15 @@ export function ComprasGestionWorkspace({ gestion, initialBrand = "", canEdit = 
 
               <div className="space-y-4">
                 <label htmlFor="gestion-estado" className="block text-xs font-semibold text-[var(--navy)]">Estado de gestión</label>
-                <select id="gestion-estado" value={draft.estadoGestion} onChange={(event) => setDraft((current) => ({ ...current, estadoGestion: event.target.value }))} className="-mt-2 h-11 w-full rounded-xl border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15">
+                <select id="gestion-estado" value={draft.estadoGestion} onChange={(event) => setDraft((current) => ({ ...current, estadoGestion: event.target.value }))} disabled={!canEdit || registroUnavailable(selected)} className="-mt-2 h-11 w-full rounded-xl border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15 disabled:opacity-60">
                   {(gestion.estados.includes(draft.estadoGestion) ? gestion.estados : [...gestion.estados, draft.estadoGestion]).map((estado) => <option key={estado} value={estado}>{estado}</option>)}
                 </select>
 
                 <label htmlFor="gestion-cantidad" className="block text-xs font-semibold text-[var(--navy)]">Cantidad decidida</label>
-                <input id="gestion-cantidad" type="number" min="0" step="1" value={draft.cantidadDecidida} onChange={(event) => setDraft((current) => ({ ...current, cantidadDecidida: event.target.value }))} placeholder="Sin cantidad" className="-mt-2 h-11 w-full rounded-xl border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15" />
+                <input id="gestion-cantidad" type="number" min="0" step="1" value={draft.cantidadDecidida} onChange={(event) => setDraft((current) => ({ ...current, cantidadDecidida: event.target.value }))} disabled={!canEdit || registroUnavailable(selected)} placeholder="Sin cantidad" className="-mt-2 h-11 w-full rounded-xl border border-[var(--line)] bg-white px-3 text-sm outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15 disabled:opacity-60" />
 
                 <label htmlFor="gestion-observacion" className="block text-xs font-semibold text-[var(--navy)]">Observación</label>
-                <textarea id="gestion-observacion" maxLength={1000} rows={5} value={draft.observacion} onChange={(event) => setDraft((current) => ({ ...current, observacion: event.target.value }))} placeholder="Agregá una observación" className="-mt-2 w-full resize-y rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15" />
+                <textarea id="gestion-observacion" maxLength={1000} rows={5} value={draft.observacion} onChange={(event) => setDraft((current) => ({ ...current, observacion: event.target.value }))} disabled={!canEdit || registroUnavailable(selected)} placeholder="Agregá una observación" className="-mt-2 w-full resize-y rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/15 disabled:opacity-60" />
                 <p className="text-right text-[11px] text-[var(--muted)]">{draft.observacion.length} / 1000 caracteres</p>
               </div>
 

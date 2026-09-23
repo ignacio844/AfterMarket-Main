@@ -40,6 +40,36 @@ export type ComprasHistorial = {
   eventos: HistorialEvento[];
 };
 
+export type GestionDecisionEvent = {
+  tipo: "MIGRACION" | "DECISION";
+  estado_gestion: string | null;
+  cantidad_decidida: number;
+  observacion: string;
+  actor: string;
+  fecha_evento: string;
+  version: number;
+};
+
+export function mergeGestionDecisionEvents(
+  historial: ComprasHistorial,
+  events: GestionDecisionEvent[],
+  unresolved = false,
+): ComprasHistorial {
+  const baseline = historial.eventos.map((event) => unresolved && event.tipo === "GESTION"
+    ? { ...event, titulo: "Decisión legacy (sin conciliar)" }
+    : event);
+  const added: HistorialEvento[] = events.filter((event) => event.tipo === "DECISION").map((event) => {
+    const date = new Date(event.fecha_evento);
+    return {
+      tipo: "GESTION", fechaOrden: date.getTime(), fecha: formatDate(date),
+      titulo: "Decisión de compra", estado: event.estado_gestion ?? "SIN RESOLVER",
+      detalle: event.cantidad_decidida > 0 ? `Cantidad decidida: ${event.cantidad_decidida}` : "",
+      responsable: event.actor, observacion: event.observacion, referencia: `Supabase · versión ${event.version}`,
+    };
+  });
+  return { ...historial, eventos: [...baseline, ...added].sort((a, b) => a.fechaOrden - b.fechaOrden) };
+}
+
 export type HistorialSheets = {
   gestionActiva: SheetRows;
   config: SheetRows;

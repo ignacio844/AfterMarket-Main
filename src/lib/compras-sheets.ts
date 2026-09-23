@@ -6,8 +6,8 @@ import { auth } from "@/auth";
 import { isPortalUserAllowed } from "@/lib/portal-auth";
 import { calculateComprasDashboard, type ComprasDashboard, type SheetRows } from "@/lib/compras-dashboard";
 import { calculateComprasGestion, overlayGestionDecisions, overlayGestionSheetRows, type ComprasGestion } from "@/lib/compras-gestion";
-import { getGestionDecisions } from "@/lib/compras-gestion-supabase";
-import { calculateComprasHistorial, type ComprasHistorial } from "@/lib/compras-historial";
+import { getGestionDecision, getGestionDecisions, getGestionEvents } from "@/lib/compras-gestion-supabase";
+import { calculateComprasHistorial, mergeGestionDecisionEvents, type ComprasHistorial } from "@/lib/compras-historial";
 import { calculateComprasEnvios, type ComprasEnvios } from "@/lib/compras-envios";
 import { calculateComprasCotizaciones, type ComprasCotizaciones } from "@/lib/compras-cotizaciones";
 import { calculateComprasBandeja, type ComprasBandeja } from "@/lib/compras-bandeja";
@@ -250,12 +250,18 @@ export async function getComprasHistorial(sku: string): Promise<ComprasHistorial
   const email = session?.user?.email;
   if (!email || !isPortalUserAllowed(email)) throw new Error("No autorizado.");
   if (!sku.trim() || sku.length > 100) throw new Error("Ingresá un SKU válido.");
-  const { sheets, timeZone } = await readCachedSheets(
-    ["gestion", "config", "alias", "gestionHistorial", "enviosCompra", "procesoCompra", "movimientosCompra"],
-    null,
-  );
-  const currentSheets = await withCurrentGestion(sheets);
-  return calculateComprasHistorial({ gestionActiva: currentSheets.gestion, ...currentSheets }, sku, timeZone);
+  const useSupabase = process.env.COMPRAS_GESTION_SOURCE === "SUPABASE";
+  const [{ sheets, timeZone }, decision, events] = await Promise.all([
+    readCachedSheets(
+      ["gestion", "config", "alias", "gestionHistorial", "enviosCompra", "procesoCompra", "movimientosCompra"],
+      null,
+    ),
+    useSupabase ? getGestionDecision(sku) : Promise.resolve(null),
+    useSupabase ? getGestionEvents(sku) : Promise.resolve([]),
+  ]);
+  const active = decision ? overlayGestionSheetRows(sheets.gestion, [decision]) : sheets.gestion;
+  const baseline = calculateComprasHistorial({ gestionActiva: active, ...sheets }, sku, timeZone);
+  return useSupabase ? mergeGestionDecisionEvents(baseline, events, decision?.requiere_revision) : baseline;
 }
 
 export async function getComprasEnvios(): Promise<ComprasEnvios> {

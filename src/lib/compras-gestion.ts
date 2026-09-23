@@ -230,7 +230,7 @@ export function summarizeGestion(registros: GestionRegistro[]) {
   let conDecision = 0;
   let compraSugerida = 0;
   for (const r of registros) {
-    if (r.estadoGestion === "PENDIENTE") pendientes++;
+    if (r.estadoGestion === "PENDIENTE" || r.requiereRevision) pendientes++;
     else conDecision++;
     compraSugerida += Number(r.compraSugerida || 0);
   }

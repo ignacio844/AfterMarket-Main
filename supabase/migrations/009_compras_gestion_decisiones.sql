@@ -97,15 +97,15 @@ begin
     v_sku := upper(btrim(v_cambio->>'sku'));
     v_estado := v_cambio->>'estadoGestion';
     v_observacion := v_cambio->>'observacion';
-    if v_sku = '' or v_estado is null or v_estado not in
+    if coalesce(v_sku, '') = '' or v_estado is null or v_estado not in
       ('PENDIENTE', 'COTIZAR', 'APROBADO', 'NO COMPRAR', 'POSTERGAR', 'ENVIADO A COMPRA') then
       raise exception 'SKU o estado inválido';
     end if;
-    if jsonb_typeof(v_cambio->'cantidadDecidida') <> 'number' then raise exception 'Cantidad inválida para %', v_sku; end if;
+    if jsonb_typeof(v_cambio->'cantidadDecidida') is distinct from 'number' then raise exception 'Cantidad inválida para %', v_sku; end if;
     v_cantidad := (v_cambio->>'cantidadDecidida')::numeric;
     if v_cantidad < 0 or v_cantidad <> trunc(v_cantidad) then raise exception 'Cantidad inválida para %', v_sku; end if;
     if v_observacion is null or char_length(v_observacion) > 1000 then raise exception 'Observación inválida para %', v_sku; end if;
-    if jsonb_typeof(v_cambio->'version') <> 'number' then raise exception 'Versión inválida para %', v_sku; end if;
+    if jsonb_typeof(v_cambio->'version') is distinct from 'number' then raise exception 'Versión inválida para %', v_sku; end if;
     select * into v_actual from portal_aftermarket.compras_gestion_decisiones
       where sku = v_sku for update;
     if not found then raise exception 'SKU no migrado: %', v_sku; end if;

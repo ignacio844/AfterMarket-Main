@@ -14,7 +14,7 @@ registerHooks({
   },
 });
 
-const { calculateComprasHistorial } = await import("../src/lib/compras-historial.ts");
+const { calculateComprasHistorial, mergeGestionDecisionEvents } = await import("../src/lib/compras-historial.ts");
 
 function serial(year, month, day, hour, minute) {
   return (Date.UTC(year, month - 1, day, hour, minute) - Date.UTC(1899, 11, 30)) / 86_400_000;
@@ -69,6 +69,19 @@ test("ports situation, policy and chronologically sorted legacy events", () => {
   assert.equal(result.eventos[0].detalle, "Cantidad decidida: 100");
   assert.equal(result.eventos[3].referencia, "MOV-1 · EC-1");
   assert.equal(result.eventos[3].proveedor, "ACME");
+});
+
+test("appends Supabase decisions without duplicating the migrated Sheet baseline", () => {
+  const baseline = calculateComprasHistorial(sheets(), "ABC", "America/Los_Angeles");
+  const updated = mergeGestionDecisionEvents(baseline, [
+    { tipo: "MIGRACION", estado_gestion: "APROBADO", cantidad_decidida: 100, observacion: "TEST", actor: "GESTION_COMPRAS", fecha_evento: "2026-09-17T12:00:00Z", version: 1 },
+    { tipo: "DECISION", estado_gestion: "POSTERGAR", cantidad_decidida: 80, observacion: "Nueva decisión", actor: "editor@grupo-aftermarket.com", fecha_evento: "2026-09-17T15:00:00Z", version: 2 },
+  ]);
+  assert.equal(updated.eventos.filter((event) => event.tipo === "GESTION").length, 2);
+  assert.equal(updated.eventos.at(-1).estado, "POSTERGAR");
+  assert.match(updated.eventos.at(-1).referencia, /versión 2/);
+  const conflict = mergeGestionDecisionEvents(baseline, [], true);
+  assert.match(conflict.eventos[0].titulo, /sin conciliar/);
 });
 
 test("keeps historical policy timing and only reports the latest decision", () => {
