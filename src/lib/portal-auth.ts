@@ -21,6 +21,7 @@ const portalEditors = [
 const executiveViewers = [
   "ignacio@grupo-aftermarket.com",
   "etelias@grupo-aftermarket.com",
+  "amilano@grupo-aftermarket.com",
   "marcos@distrimar.com.ar",
 ];
 
