@@ -12,6 +12,7 @@ const links = [
   { id: "ejecutivo", label: "Ejecutivo", href: "/ejecutivo" },
   { id: "it", label: "IT", href: "/it" },
   { id: "wms", label: "WMS", href: "/areas/wms" },
+  { id: "etiquetas", label: "Etiquetas", href: "/etiquetas" },
   { id: "auditoria", label: "Auditoría", href: "/areas/auditoria" },
   { id: "ventas", label: "Ventas", href: "/areas/ventas" },
   { id: "compras", label: "Compras", href: "/areas/compras" },

@@ -9,6 +9,14 @@ export type PortalAccess = {
 
 export const portalAccesses: PortalAccess[] = [
   {
+    id: "etiquetas",
+    name: "Etiquetas",
+    description: "Plantillas estándar y archivos compartidos de etiquetas.",
+    href: "/etiquetas",
+    eyebrow: "Estándares",
+    enabled: true,
+  },
+  {
     id: "it",
     name: "IT",
     description: "Aplicaciones y soluciones web internas.",

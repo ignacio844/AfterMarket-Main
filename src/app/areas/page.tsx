@@ -20,7 +20,7 @@ export default function AreasPage() {
             <Link key={area.id} href={area.href} className="flex min-h-52 flex-col justify-between rounded-[24px] border border-[var(--line)] bg-white p-6 transition hover:-translate-y-0.5 hover:border-[var(--navy)]">
               <div className="flex items-start justify-between gap-4">
                 <span className="text-xs font-bold text-[var(--blue)]">{String(index + 1).padStart(2, "0")}</span>
-                <span className="rounded-full bg-[var(--soft)] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Próximamente</span>
+                <span className={area.enabled ? "rounded-full bg-blue-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--blue)]" : "rounded-full bg-[var(--soft)] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]"}>{area.enabled ? "Disponible" : "Próximamente"}</span>
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[var(--blue)]">{area.eyebrow}</p>
