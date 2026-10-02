@@ -12,12 +12,12 @@ const links = [
   { id: "ejecutivo", label: "Ejecutivo", href: "/ejecutivo" },
   { id: "it", label: "IT", href: "/it" },
   { id: "wms", label: "WMS", href: "/areas/wms" },
-  { id: "etiquetas", label: "Etiquetas", href: "/etiquetas" },
   { id: "auditoria", label: "Auditoría", href: "/areas/auditoria" },
   { id: "ventas", label: "Ventas", href: "/areas/ventas" },
   { id: "compras", label: "Compras", href: "/areas/compras" },
   { id: "comex", label: "COMEX", href: "/areas/comex" },
   { id: "capital-humano", label: "Capital Humano", href: "/areas/capital-humano" },
+  { id: "etiquetas", label: "Etiquetas", href: "/etiquetas" },
 ] as const;
 
 type NavigationLink = (typeof links)[number];
